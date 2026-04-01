@@ -1,17 +1,22 @@
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <bitset>
 #include <iostream>
+#include <mutex>
 #include <random>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <GLFW/glfw3.h>
 
+#include "app_state.h"
 #include "hints_solver.h"
 #include "imgui.h"
 #include "snapshot_io.h"
 #include "sudoku_core.h"
+#include "ui_constants.h"
 #include "ui_helpers.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
@@ -353,98 +358,204 @@ Puzzle GenerateHardPuzzle(std::mt19937& rng) {
 }
 
 Puzzle GeneratePuzzleWithDifficulty(std::mt19937& rng, Difficulty difficulty) {
-  constexpr int kMaxAttempts = 60;
+  constexpr int kMaxAttemptsPerThread = 200;
+  constexpr int kNumThreads = 6;  // Performance cores only
 
   int targetMinClues = 24;
-  bool requireNotSinglesSolvable = true;
+  int targetScoreMin = 0;
+  int targetScoreMax = 1000;
 
+  // Map difficulty to required score ranges
+  // New scoring: Naked Single=1, Hidden Single=3, Pointing Pair=10, Box/Line=10,
+  // Naked Pair=15, Hidden Pair=20, Naked Triple=30, Hidden Triple=40
   switch (difficulty) {
     case Difficulty::kSimple:
-      targetMinClues = 40;
-      requireNotSinglesSolvable = false;
+      targetMinClues = 45;
+      targetScoreMin = 0;
+      targetScoreMax = 5;
       break;
     case Difficulty::kEasy:
-      targetMinClues = 35;
-      requireNotSinglesSolvable = false;
+      targetMinClues = 40;
+      targetScoreMin = 4;
+      targetScoreMax = 20;
       break;
     case Difficulty::kMild:
-      targetMinClues = 32;
-      requireNotSinglesSolvable = true;
+      targetMinClues = 35;
+      targetScoreMin = 18;
+      targetScoreMax = 50;
       break;
     case Difficulty::kModerate:
-      targetMinClues = 28;
-      requireNotSinglesSolvable = true;
+      targetMinClues = 30;
+      targetScoreMin = 48;
+      targetScoreMax = 120;
       break;
     case Difficulty::kHard:
-      targetMinClues = 24;
-      requireNotSinglesSolvable = true;
+      targetMinClues = 25;
+      targetScoreMin = 110;
+      targetScoreMax = 250;
       break;
     case Difficulty::kVeryHard:
       targetMinClues = 22;
-      requireNotSinglesSolvable = true;
+      targetScoreMin = 240;
+      targetScoreMax = 400;
       break;
     case Difficulty::kFiendish:
       targetMinClues = 20;
-      requireNotSinglesSolvable = true;
+      targetScoreMin = 390;
+      targetScoreMax = 600;
       break;
     case Difficulty::kDiabolical:
       targetMinClues = 17;
-      requireNotSinglesSolvable = true;
+      targetScoreMin = 590;
+      targetScoreMax = 2000;
       break;
   }
 
-  Puzzle best = {};
-  int bestClues = 81;
+  std::atomic<bool> puzzleFound{false};
+  Puzzle bestPuzzle{};
+  std::mutex resultLock;
+  std::atomic<int> totalAttempts{0};
 
-  for (int attempt = 0; attempt < kMaxAttempts; ++attempt) {
-    Puzzle solved = {};
-    FillSolvedBoard(solved, 0, rng);
+  std::cerr << "Generating " << DifficultyName(difficulty) << " puzzle with "
+            << kNumThreads << " threads (" << (kMaxAttemptsPerThread * kNumThreads)
+            << " total attempts)..." << std::endl;
 
-    Puzzle puzzle = solved;
-    std::vector<int> positions(81);
-    for (int i = 0; i < 81; ++i) {
-      positions[i] = i;
-    }
-    std::shuffle(positions.begin(), positions.end(), rng);
+  // Worker function for each thread
+  auto workerFn = [&](int threadId) {
+    std::random_device rd;
+    std::mt19937 threadRng(rd() + threadId);
 
-    int clues = 81;
-    for (int idx : positions) {
-      if (clues <= targetMinClues) {
-        break;
+    Puzzle best{};
+    int bestClues = 81;
+    int bestScoreDistance = 10000;
+    int totalThreadAttempts = 0;
+
+    for (int attempt = 0; attempt < kMaxAttemptsPerThread && !puzzleFound; ++attempt) {
+      // Generate a random complete solved puzzle
+      Puzzle full{};
+      FillSolvedBoard(full, 0, threadRng);
+
+      // Try removing clues
+      Puzzle current = full;
+      std::vector<std::pair<int, int>> positions;
+      for (int r = 0; r < kGridSize; ++r) {
+        for (int c = 0; c < kGridSize; ++c) {
+          positions.push_back({r, c});
+        }
+      }
+      std::shuffle(positions.begin(), positions.end(), threadRng);
+
+      // Remove clues — check uniqueness and allow early exit if another thread succeeded
+      for (const auto& [r, c] : positions) {
+        if (puzzleFound) return;
+
+        int value = current[r][c];
+        current[r][c] = 0;
+
+        Puzzle check = current;
+        if (CountSolutions(check, 2) != 1) {
+          current[r][c] = value;
+        }
       }
 
-      const int row = idx / 9;
-      const int col = idx % 9;
-      const int backup = puzzle[row][col];
-      puzzle[row][col] = 0;
+      int clueCount = 0;
+      for (int r = 0; r < kGridSize; ++r) {
+        for (int c = 0; c < kGridSize; ++c) {
+          if (current[r][c] != 0) clueCount++;
+        }
+      }
 
-      Puzzle check = puzzle;
-      if (CountSolutions(check, 2) != 1) {
-        puzzle[row][col] = backup;
+      totalThreadAttempts++;
+      totalAttempts++;
+
+      // Log progress every 50 total attempts per thread — no lock needed, cerr is thread-safe
+      if (totalThreadAttempts % 50 == 0) {
+        std::cerr << "[Thread " << threadId << "] Processed " << totalThreadAttempts
+                  << " puzzles, best distance: " << bestScoreDistance << std::endl;
+      }
+
+      if (clueCount < targetMinClues) {
         continue;
       }
-      --clues;
+
+      int score = SolveAndScore(current);
+      int scoreDistance = std::abs(score - (targetScoreMin + targetScoreMax) / 2);
+
+      // Check puzzleFound less frequently
+      if ((attempt % 10 == 0) && puzzleFound) {
+        return;
+      }
+
+      if (score >= targetScoreMin && score <= targetScoreMax) {
+        // Perfect match found
+        {
+          std::lock_guard<std::mutex> lock(resultLock);
+          if (!puzzleFound) {
+            std::cerr << "[Thread " << threadId << "] Found perfect match! Score: " << score
+                      << " (" << clueCount << " clues)" << std::endl;
+            bestPuzzle = current;
+            puzzleFound = true;
+          }
+        }
+        return;
+      }
+
+      if (clueCount >= targetMinClues && scoreDistance < bestScoreDistance) {
+        best = current;
+        bestClues = clueCount;
+        bestScoreDistance = scoreDistance;
+        std::cerr << "[Thread " << threadId << "] New best - Score: " << score
+                  << " (distance: " << scoreDistance << ", " << clueCount << " clues)"
+                  << std::endl;
+      }
     }
 
-    const bool singlesSolvable = SolveWithSinglesOnly(puzzle);
-    
-    if (requireNotSinglesSolvable) {
-      if (!singlesSolvable) {
-        return puzzle;
-      }
-    } else {
-      if (singlesSolvable) {
-        return puzzle;
+    // If this thread found any candidate, store it as fallback
+    if (bestScoreDistance < 10000) {
+      std::lock_guard<std::mutex> lock(resultLock);
+      if (!puzzleFound) {
+        std::cerr << "[Thread " << threadId << "] Completed. Best score distance: "
+                  << bestScoreDistance << std::endl;
+        bestPuzzle = best;
+        puzzleFound = true;
       }
     }
+  };
 
-    if (clues < bestClues) {
-      best = puzzle;
-      bestClues = clues;
-    }
+  // Launch worker threads
+  std::vector<std::thread> threads;
+  for (int i = 0; i < kNumThreads; ++i) {
+    threads.emplace_back(workerFn, i);
   }
 
-  return best;
+  // Wait for all threads to complete
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  std::cerr << "Generation complete. Total attempts: " << totalAttempts << std::endl;
+
+  // If no puzzle was found, return a blank puzzle
+  if (!puzzleFound) {
+    std::cerr << "Warning: Could not generate puzzle of difficulty "
+              << DifficultyName(difficulty) << " after "
+              << totalAttempts << " attempts." << std::endl;
+    return {};
+  }
+
+  // Count clues in final puzzle
+  int finalClues = 0;
+  for (int r = 0; r < kGridSize; ++r) {
+    for (int c = 0; c < kGridSize; ++c) {
+      if (bestPuzzle[r][c] != 0) finalClues++;
+    }
+  }
+  int finalScore = SolveAndScore(bestPuzzle);
+
+  std::cerr << "Generated " << DifficultyName(difficulty) << " puzzle: "
+            << finalClues << " clues, score " << finalScore << std::endl;
+
+  return bestPuzzle;
 }
 
 Grid BuildGrid(const Puzzle& puzzle) {
@@ -554,171 +665,6 @@ std::bitset<9> ComputeCandidates(const Grid& grid, int row, int col) {
   return candidates;
 }
 
-using CandidateGrid = std::array<std::array<std::bitset<9>, kGridSize>, kGridSize>;
-
-struct UnitCells {
-  std::array<HintCell, 9> cells;
-};
-
-CandidateGrid BuildCandidateGrid(const Grid& grid) {
-  CandidateGrid candidates{};
-  for (int row = 0; row < kGridSize; ++row) {
-    for (int col = 0; col < kGridSize; ++col) {
-      const std::bitset<9> legalCandidates = ComputeCandidates(grid, row, col);
-      if (grid[row][col].value != 0) {
-        candidates[row][col].reset();
-        continue;
-      }
-
-      // Use visible pencil marks as the current candidate state when present,
-      // but clamp them to legal values so stale notes do not survive placements.
-      if (grid[row][col].pencil.any()) {
-        candidates[row][col] = legalCandidates & grid[row][col].pencil;
-      } else {
-        candidates[row][col] = legalCandidates;
-      }
-    }
-  }
-  return candidates;
-}
-
-std::vector<UnitCells> BuildAllUnits() {
-  std::vector<UnitCells> units;
-  units.reserve(27);
-
-  for (int row = 0; row < kGridSize; ++row) {
-    UnitCells unit{};
-    for (int col = 0; col < kGridSize; ++col) {
-      unit.cells[col] = {row, col};
-    }
-    units.push_back(unit);
-  }
-
-  for (int col = 0; col < kGridSize; ++col) {
-    UnitCells unit{};
-    for (int row = 0; row < kGridSize; ++row) {
-      unit.cells[row] = {row, col};
-    }
-    units.push_back(unit);
-  }
-
-  for (int boxRow = 0; boxRow < 3; ++boxRow) {
-    for (int boxCol = 0; boxCol < 3; ++boxCol) {
-      UnitCells unit{};
-      int index = 0;
-      for (int row = boxRow * 3; row < boxRow * 3 + 3; ++row) {
-        for (int col = boxCol * 3; col < boxCol * 3 + 3; ++col) {
-          unit.cells[index++] = {row, col};
-        }
-      }
-      units.push_back(unit);
-    }
-  }
-
-  return units;
-}
-
-bool ContainsCell(const std::vector<HintCell>& cells, int row, int col) {
-  for (const HintCell& cell : cells) {
-    if (cell.row == row && cell.col == col) {
-      return true;
-    }
-  }
-  return false;
-}
-
-void AddUniqueCell(std::vector<HintCell>& cells, int row, int col) {
-  if (!ContainsCell(cells, row, col)) {
-    cells.push_back({row, col});
-  }
-}
-
-bool SeesBoth(const HintCell& target, const HintCell& left, const HintCell& right) {
-  return SharesUnit(target.row, target.col, left.row, left.col) &&
-         SharesUnit(target.row, target.col, right.row, right.col);
-}
-
-template <typename Func>
-bool ForEachCombination(const std::vector<int>& values,
-                        int choose,
-                        int start,
-                        std::vector<int>& current,
-                        Func&& func) {
-  if (static_cast<int>(current.size()) == choose) {
-    return func(current);
-  }
-
-  for (int index = start; index <= static_cast<int>(values.size()) - (choose - static_cast<int>(current.size()));
-       ++index) {
-    current.push_back(values[index]);
-    if (ForEachCombination(values, choose, index + 1, current, func)) {
-      return true;
-    }
-    current.pop_back();
-  }
-
-  return false;
-}
-
-Hint MakeHint(const char* techniqueName, const std::vector<HintCell>& cells) {
-  Hint hint;
-  hint.techniqueName = techniqueName;
-  hint.affectedCells = cells;
-  return hint;
-}
-
-std::vector<int> ExtractDigits(const std::bitset<9>& mask) {
-  std::vector<int> digits;
-  for (int digit = 0; digit < 9; ++digit) {
-    if (mask.test(digit)) {
-      digits.push_back(digit + 1);
-    }
-  }
-  return digits;
-}
-
-Hint MakeHint(const char* techniqueName,
-              const std::vector<HintCell>& cells,
-              const std::vector<int>& digits) {
-  Hint hint;
-  hint.techniqueName = techniqueName;
-  hint.affectedCells = cells;
-  hint.involvedDigits = digits;
-  return hint;
-}
-
-Hint MakeHint(const char* techniqueName,
-              const std::vector<HintCell>& cells,
-              const std::vector<int>& digits,
-              const std::vector<HintCell>& chainEndpoints) {
-  Hint hint;
-  hint.techniqueName = techniqueName;
-  hint.affectedCells = cells;
-  hint.involvedDigits = digits;
-  hint.chainEndpoints = chainEndpoints;
-  return hint;
-}
-
-Hint MakeHint(const char* techniqueName,
-              const std::vector<HintCell>& cells,
-              const std::vector<int>& digits,
-              const std::vector<HintCell>& chainEndpoints,
-              const std::vector<HintCell>& chainCells) {
-  Hint hint;
-  hint.techniqueName = techniqueName;
-  hint.affectedCells = cells;
-  hint.involvedDigits = digits;
-  hint.chainEndpoints = chainEndpoints;
-  hint.chainCells = chainCells;
-  return hint;
-}
-
-bool SharesUnit(int r1, int c1, int r2, int c2) {
-  if (r1 == r2 || c1 == c2) {
-    return true;
-  }
-  return (r1 / 3 == r2 / 3) && (c1 / 3 == c2 / 3);
-}
 
 void ConfigureStyle() {
   ImGui::StyleColorsLight();
@@ -791,61 +737,54 @@ void DrawBoard(Grid& grid,
       const ImVec2 cellMax(cellMin.x + kCellSize, cellMin.y + kCellSize);
       const bool hintCellActive = hint.revealPhase >= 2 && ContainsCell(hint.affectedCells, r, c);
 
-      ImU32 fill = IM_COL32(253, 251, 246, 255);
+      ImU32 fill = kCellBackgroundColor;
       if (SharesUnit(r, c, selectedRow, selectedCol)) {
-        fill = IM_COL32(247, 236, 209, 255);
-      }
-      if (highlightDigit != 0 && grid[r][c].value == 0 &&
-          grid[r][c].pencil.test(highlightDigit - 1)) {
-        // Matching pencil marks are highlighted per-note below, not by tinting the whole cell.
+        fill = kCellHoveredColor;
       }
       if (grid[r][c].colorTag > 0) {
         fill = kTagColors[grid[r][c].colorTag];
       }
       const int chainIndex = (hint.revealPhase >= 2) ? hint.ChainIndex(r, c) : -1;
       if (chainIndex >= 0) {
-        fill = (chainIndex % 2 == 0) ? IM_COL32(138, 210, 255, 220) : IM_COL32(166, 235, 196, 220);
-      }
-      if (hintCellActive) {
-        fill = IM_COL32(135, 206, 250, 200);
-      }
-      if (chainIndex >= 0) {
-        fill = (chainIndex % 2 == 0) ? IM_COL32(138, 210, 255, 220) : IM_COL32(166, 235, 196, 220);
+        // Chain cells get alternating colors (priority over general hint color)
+        fill = (chainIndex % 2 == 0) ? kChainAlternateColorA : kChainAlternateColorB;
+      } else if (hintCellActive) {
+        // Elimination-target cells: use a warm amber when chain cells are also
+        // present so targets stand out clearly from the blue/green chain cells.
+        fill = hint.chainCells.empty() ? kCellHintColor : kCellHintEliminationColor;
       }
       if (r == selectedRow && c == selectedCol) {
-        fill = IM_COL32(255, 228, 173, 255);
+        fill = kCellSelectedColor;
       }
 
       draw->AddRectFilled(cellMin, cellMax, fill);
 
       const int value = grid[r][c].value;
       if (hint.revealPhase >= 3 && hintCellActive && value != 0 && hint.IncludesDigit(value)) {
-        draw->AddRect(ImVec2(cellMin.x + 4.0f, cellMin.y + 4.0f),
-                      ImVec2(cellMax.x - 4.0f, cellMax.y - 4.0f),
-                      IM_COL32(255, 140, 0, 255), 6.0f, 0, 3.0f);
+        draw->AddRect(ImVec2(cellMin.x + kCellEdgeInset, cellMin.y + kCellEdgeInset),
+                      ImVec2(cellMax.x - kCellEdgeInset, cellMax.y - kCellEdgeInset),
+                      kHintDigitHighlightColor, kCellBorderRadius, 0, kCellBorderThickness);
       }
       if (hint.revealPhase >= 2 && hint.IsChainEnd(r, c)) {
-        draw->AddRect(ImVec2(cellMin.x + 2.0f, cellMin.y + 2.0f),
-                      ImVec2(cellMax.x - 2.0f, cellMax.y - 2.0f),
-                      IM_COL32(30, 100, 210, 255), 6.0f, 0, 3.0f);
+        draw->AddRect(ImVec2(cellMin.x + 1.0f, cellMin.y + 1.0f),
+                      ImVec2(cellMax.x - 1.0f, cellMax.y - 1.0f),
+                      kChainEndpointBorderColor, kChainEndpointBorderRadius, 0,
+                      kChainEndpointBorderThickness);
       }
       if (highlightDigit != 0 && value == highlightDigit && !highlightPairs) {
         const ImVec2 center(cellMin.x + kCellSize * 0.5f, cellMin.y + kCellSize * 0.5f);
-        draw->AddCircleFilled(center, kCellSize * 0.34f, IM_COL32(0, 255, 0, 120));
+        draw->AddCircleFilled(center, kCellSize * kCircleRadiusFactor, kPencilHighlightBackgroundColor);
       }
       if (value != 0) {
-        ImU32 textColor = grid[r][c].fixed ? IM_COL32(42, 36, 29, 255) : IM_COL32(34, 92, 126, 255);
+        ImU32 textColor = grid[r][c].fixed ? kFixedDigitColor : kUserDigitColor;
         const bool hasConflict = IsConflict(grid, r, c, value);
         const bool wrongBySolution =
             hasSolution && solution != nullptr && !grid[r][c].fixed && value != (*solution)[r][c];
-        if (hasConflict) {
-          textColor = IM_COL32(192, 62, 62, 255);
-        }
-        if (wrongBySolution) {
-          textColor = IM_COL32(192, 62, 62, 255);
+        if (hasConflict || wrongBySolution) {
+          textColor = kConflictDigitColor;
         }
         if (solved) {
-          textColor = IM_COL32(44, 128, 80, 255);
+          textColor = kSolvedDigitColor;
         }
 
         const std::string text = std::to_string(value);
@@ -871,20 +810,21 @@ void DrawBoard(Grid& grid,
         const int slotR = (d - 1) / 3;
         const int slotC = (d - 1) % 3;
         const std::string text = std::to_string(d);
-        ImU32 noteColor = (highlightDigit == d) ? IM_COL32(35, 95, 130, 255) : IM_COL32(104, 96, 84, 255);
-        const ImVec2 notePos(cellMin.x + 10.0f + slotC * 23.0f, cellMin.y + 7.0f + slotR * 20.0f);
+        ImU32 noteColor = (highlightDigit == d) ? kPencilHighlightColor : kPencilMarkColor;
+        const ImVec2 notePos(cellMin.x + kPencilMarkStartX + slotC * kPencilMarkSpacingX,
+                             cellMin.y + kPencilMarkStartY + slotR *kPencilMarkSpacingY);
 
         const ImVec2 noteSize =
             noteFont->CalcTextSizeA(noteFont->FontSize, FLT_MAX, 0.0f, text.c_str());
         if (highlightDigit == d || (highlightPairs && grid[r][c].pencil.count() == 2)) {
           draw->AddRectFilled(ImVec2(notePos.x - 2.0f, notePos.y - 1.0f),
                               ImVec2(notePos.x + noteSize.x + 2.0f, notePos.y + noteSize.y + 1.0f),
-                              IM_COL32(0, 255, 0, 255), 3.0f);
+                              kPencilHighlightBackgroundColor, kPencilMarkBorderRadius);
         }
         if (hint.revealPhase >= 3 && hintCellActive && hint.IncludesDigit(d)) {
           draw->AddRect(ImVec2(notePos.x - 3.0f, notePos.y - 2.0f),
                         ImVec2(notePos.x + noteSize.x + 3.0f, notePos.y + noteSize.y + 2.0f),
-                        IM_COL32(255, 140, 0, 255), 3.0f, 0, 2.0f);
+                        kHintDigitHighlightColor, kPencilMarkBorderRadius, 0, kPencilMarkBorderThickness);
         }
 
         draw->AddText(noteFont,
@@ -896,41 +836,12 @@ void DrawBoard(Grid& grid,
     }
   }
 
-  for (int i = 0; i <= kGridSize; ++i) {
-    const float x = origin.x + i * kCellSize;
-    const float y = origin.y + i * kCellSize;
-    const float thickness = (i % 3 == 0) ? 3.2f : 1.0f;
-    const ImU32 color = (i % 3 == 0) ? IM_COL32(52, 44, 33, 255) : IM_COL32(139, 126, 104, 255);
-
-    draw->AddLine(ImVec2(x, origin.y), ImVec2(x, boardMax.y), color, thickness);
-    draw->AddLine(ImVec2(origin.x, y), ImVec2(boardMax.x, y), color, thickness);
-  }
+  DrawGridLines(draw, origin, boardMax);
 
   ImGui::EndChild();
 
-  ImGui::SameLine(0.0f, 12.0f);
-  ImGui::BeginChild("TagPanel", ImVec2(164.0f, kBoardSize + 18.0f), true,
-                    ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar);
-
-  ImGui::TextUnformatted("Color Tags");
-  ImGui::Spacing();
-  for (int tag = 1; tag <= 9; ++tag) {
-    ImGui::PushID(tag);
-    if (mode == InputMode::kColor && activeColor == tag) {
-      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.24f, 0.52f, 0.72f, 1.0f));
-    } else {
-      const ImVec4 c = ImGui::ColorConvertU32ToFloat4(kTagColors[tag]);
-      ImGui::PushStyleColor(ImGuiCol_Button, c);
-    }
-
-    if (ImGui::Button(std::to_string(tag).c_str(), ImVec2(108.0f, 30.0f))) {
-      activeColor = tag;
-    }
-    ImGui::PopStyleColor();
-    ImGui::PopID();
-  }
-
-  ImGui::EndChild();
+  ImGui::SameLine(0.0f, kBoardPanelMargin);
+  DrawColorTagPanel(activeColor, mode, kTagColors);
 }
 
 }  // namespace sudoku
@@ -943,6 +854,7 @@ int main(int argc, char** argv) {
   }
 
   if (!glfwInit()) {
+    std::cerr << "Error: Failed to initialize GLFW" << std::endl;
     return 1;
   }
 
@@ -950,8 +862,11 @@ int main(int argc, char** argv) {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
-  GLFWwindow* window = glfwCreateWindow(1280, 940, "Sudoku Studio", nullptr, nullptr);
+  GLFWwindow* window = glfwCreateWindow(
+      static_cast<int>(kWindowWidth), static_cast<int>(kWindowHeight),
+      "Sudoku Studio", nullptr, nullptr);
   if (window == nullptr) {
+    std::cerr << "Error: Failed to create GLFW window" << std::endl;
     glfwTerminate();
     return 1;
   }
@@ -978,53 +893,57 @@ int main(int argc, char** argv) {
   ImFont* uiFont = nullptr;
   ImFont* digitFont = nullptr;
   ImFont* noteFont = nullptr;
+
   for (const std::string& fontPath : fontCandidates) {
     if (uiFont == nullptr) {
-      uiFont = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), 22.0f);
+      uiFont = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), kUIFontSize);
+      if (uiFont != nullptr) {
+        std::cerr << "Loaded UI font from: " << fontPath << std::endl;
+      }
     }
     if (digitFont == nullptr) {
-      digitFont = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), 40.0f);
+      digitFont = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), kDigitFontSize);
+      if (digitFont != nullptr) {
+        std::cerr << "Loaded digit font from: " << fontPath << std::endl;
+      }
     }
     if (noteFont == nullptr) {
-      noteFont = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), 16.0f);
+      noteFont = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), kPencilMarkFontSize);
+      if (noteFont != nullptr) {
+        std::cerr << "Loaded note font from: " << fontPath << std::endl;
+      }
+    }
+
+    // All fonts loaded successfully
+    if (uiFont != nullptr && digitFont != nullptr && noteFont != nullptr) {
+      break;
     }
   }
 
   if (uiFont == nullptr || digitFont == nullptr || noteFont == nullptr) {
-    uiFont = io.Fonts->AddFontDefault();
-    digitFont = uiFont;
-    noteFont = uiFont;
+    std::cerr << "Warning: Could not load custom fonts. Using ImGui default font." << std::endl;
+    ImFont* defaultFont = io.Fonts->AddFontDefault();
+    if (uiFont == nullptr) uiFont = defaultFont;
+    if (digitFont == nullptr) digitFont = defaultFont;
+    if (noteFont == nullptr) noteFont = defaultFont;
   }
 
   std::random_device rd;
   std::mt19937 rng(rd());
 
-  Puzzle puzzle = GeneratePuzzleWithDifficulty(rng, Difficulty::kHard);
-  Puzzle givens = puzzle;
-  Grid grid = BuildGrid(puzzle);
-  Puzzle solution = {};
-  bool hasSolution = ComputeSolutionFromGivens(givens, solution);
+  PuzzleState puzzleState;
+  puzzleState.puzzle = GeneratePuzzleWithDifficulty(rng, Difficulty::kHard);
+  puzzleState.givens = puzzleState.puzzle;
+  puzzleState.grid = BuildGrid(puzzleState.puzzle);
+  puzzleState.hasSolution = ComputeSolutionFromGivens(puzzleState.givens, puzzleState.solution);
+  puzzleState.score = SolveAndScoreDetailed(puzzleState.puzzle);
 
-  int selectedRow = 0;
-  int selectedCol = 0;
-  int activeColor = 1;
-  bool highlightPairs = false;
-  bool showWrongEntrySlash = true;
-  InputMode mode = InputMode::kDigit;
-  Difficulty selectedDifficulty = Difficulty::kHard;
-  std::vector<Grid> undoHistory;
-  std::string snapshotText;
-  bool openSnapshotPopup = false;
-  static char loadInputBuf[16384] = {};
-  bool openLoadPopup = false;
-  std::string loadErrorMessage;
-  
-  Hint currentHint;
-  int hintPhaseCounter = 0;
+  std::cerr << "Initial puzzle score: " << puzzleState.score.totalScore << std::endl;
 
-  std::string statusMessage =
-      "Menu/toolbar enabled. Ctrl+Z undo, P auto-pencil, K naked singles, H hidden singles";
-  int statusFrames = 480;
+  UIState uiState;
+  uiState.selectedDifficulty = Difficulty::kHard;
+  uiState.statusMessage = "Menu/toolbar enabled. Ctrl+Z undo, P auto-pencil, K naked singles, H hidden singles";
+  uiState.statusFrames = 480;
 
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
@@ -1046,36 +965,36 @@ int main(int argc, char** argv) {
     if (ImGui::BeginMainMenuBar()) {
       if (ImGui::BeginMenu("File")) {
         if (ImGui::BeginMenu("New Puzzle")) {
-          if (ImGui::MenuItem("Simple", nullptr, selectedDifficulty == Difficulty::kSimple)) {
-            selectedDifficulty = Difficulty::kSimple;
+          if (ImGui::MenuItem("Simple", nullptr, uiState.selectedDifficulty == Difficulty::kSimple)) {
+            uiState.selectedDifficulty = Difficulty::kSimple;
             requestNewPuzzle = true;
           }
-          if (ImGui::MenuItem("Easy", nullptr, selectedDifficulty == Difficulty::kEasy)) {
-            selectedDifficulty = Difficulty::kEasy;
+          if (ImGui::MenuItem("Easy", nullptr, uiState.selectedDifficulty == Difficulty::kEasy)) {
+            uiState.selectedDifficulty = Difficulty::kEasy;
             requestNewPuzzle = true;
           }
-          if (ImGui::MenuItem("Mild", nullptr, selectedDifficulty == Difficulty::kMild)) {
-            selectedDifficulty = Difficulty::kMild;
+          if (ImGui::MenuItem("Mild", nullptr, uiState.selectedDifficulty == Difficulty::kMild)) {
+            uiState.selectedDifficulty = Difficulty::kMild;
             requestNewPuzzle = true;
           }
-          if (ImGui::MenuItem("Moderate", nullptr, selectedDifficulty == Difficulty::kModerate)) {
-            selectedDifficulty = Difficulty::kModerate;
+          if (ImGui::MenuItem("Moderate", nullptr, uiState.selectedDifficulty == Difficulty::kModerate)) {
+            uiState.selectedDifficulty = Difficulty::kModerate;
             requestNewPuzzle = true;
           }
-          if (ImGui::MenuItem("Hard", nullptr, selectedDifficulty == Difficulty::kHard)) {
-            selectedDifficulty = Difficulty::kHard;
+          if (ImGui::MenuItem("Hard", nullptr, uiState.selectedDifficulty == Difficulty::kHard)) {
+            uiState.selectedDifficulty = Difficulty::kHard;
             requestNewPuzzle = true;
           }
-          if (ImGui::MenuItem("Very Hard", nullptr, selectedDifficulty == Difficulty::kVeryHard)) {
-            selectedDifficulty = Difficulty::kVeryHard;
+          if (ImGui::MenuItem("Very Hard", nullptr, uiState.selectedDifficulty == Difficulty::kVeryHard)) {
+            uiState.selectedDifficulty = Difficulty::kVeryHard;
             requestNewPuzzle = true;
           }
-          if (ImGui::MenuItem("Fiendish", nullptr, selectedDifficulty == Difficulty::kFiendish)) {
-            selectedDifficulty = Difficulty::kFiendish;
+          if (ImGui::MenuItem("Fiendish", nullptr, uiState.selectedDifficulty == Difficulty::kFiendish)) {
+            uiState.selectedDifficulty = Difficulty::kFiendish;
             requestNewPuzzle = true;
           }
-          if (ImGui::MenuItem("Diabolical", nullptr, selectedDifficulty == Difficulty::kDiabolical)) {
-            selectedDifficulty = Difficulty::kDiabolical;
+          if (ImGui::MenuItem("Diabolical", nullptr, uiState.selectedDifficulty == Difficulty::kDiabolical)) {
+            uiState.selectedDifficulty = Difficulty::kDiabolical;
             requestNewPuzzle = true;
           }
           ImGui::EndMenu();
@@ -1086,7 +1005,7 @@ int main(int argc, char** argv) {
         ImGui::EndMenu();
       }
       if (ImGui::BeginMenu("Tools")) {
-        if (ImGui::MenuItem("Undo", "Ctrl+Z", false, !undoHistory.empty())) {
+        if (ImGui::MenuItem("Undo", "Ctrl+Z", false, !uiState.undoHistory.empty())) {
           requestUndo = true;
         }
         if (ImGui::MenuItem("Snapshot", nullptr)) {
@@ -1104,15 +1023,15 @@ int main(int argc, char** argv) {
         if (ImGui::MenuItem("Solve Hidden Singles", "H")) {
           requestSolveHiddenSingles = true;
         }
-        if (ImGui::MenuItem("Highlight Pencil Pairs", "B", highlightPairs)) {
-          highlightPairs = !highlightPairs;
-          statusMessage = highlightPairs ? "Pair highlight enabled" : "Pair highlight disabled";
-          statusFrames = 200;
+        if (ImGui::MenuItem("Highlight Pencil Pairs", "B", uiState.highlightPairs)) {
+          uiState.highlightPairs = !uiState.highlightPairs;
+          uiState.statusMessage = uiState.highlightPairs ? "Pair highlight enabled" : "Pair highlight disabled";
+          uiState.statusFrames = 200;
         }
-        if (ImGui::MenuItem("Wrong Entry Slash", nullptr, showWrongEntrySlash)) {
-          showWrongEntrySlash = !showWrongEntrySlash;
-          statusMessage = showWrongEntrySlash ? "Wrong-entry slash enabled" : "Wrong-entry slash disabled";
-          statusFrames = 200;
+        if (ImGui::MenuItem("Wrong Entry Slash", nullptr, uiState.showWrongEntrySlash)) {
+          uiState.showWrongEntrySlash = !uiState.showWrongEntrySlash;
+          uiState.statusMessage = uiState.showWrongEntrySlash ? "Wrong-entry slash enabled" : "Wrong-entry slash disabled";
+          uiState.statusFrames = 200;
         }
         if (ImGui::MenuItem("Hint", "?")) {
           requestHint = true;
@@ -1120,14 +1039,14 @@ int main(int argc, char** argv) {
         ImGui::EndMenu();
       }
       if (ImGui::BeginMenu("Mode")) {
-        if (ImGui::MenuItem("Digit", "Q", mode == InputMode::kDigit)) {
-          mode = InputMode::kDigit;
+        if (ImGui::MenuItem("Digit", "Q", uiState.mode == InputMode::kDigit)) {
+          uiState.mode = InputMode::kDigit;
         }
-        if (ImGui::MenuItem("Pencil", "E", mode == InputMode::kPencil)) {
-          mode = InputMode::kPencil;
+        if (ImGui::MenuItem("Pencil", "E", uiState.mode == InputMode::kPencil)) {
+          uiState.mode = InputMode::kPencil;
         }
-        if (ImGui::MenuItem("Color", "R", mode == InputMode::kColor)) {
-          mode = InputMode::kColor;
+        if (ImGui::MenuItem("Color", "R", uiState.mode == InputMode::kColor)) {
+          uiState.mode = InputMode::kColor;
         }
         ImGui::EndMenu();
       }
@@ -1145,7 +1064,7 @@ int main(int argc, char** argv) {
       requestNewPuzzle = true;
     }
     ImGui::SameLine();
-    if (ImGui::Button("Undo", ImVec2(90, 34)) && !undoHistory.empty()) {
+    if (ImGui::Button("Undo", ImVec2(90, 34)) && !uiState.undoHistory.empty()) {
       requestUndo = true;
     }
     ImGui::SameLine();
@@ -1158,13 +1077,13 @@ int main(int argc, char** argv) {
     }
     ImGui::SameLine();
     ImGui::SetNextItemWidth(120.0f);
-    int difficultyIdx = static_cast<int>(selectedDifficulty);
+    int difficultyIdx = static_cast<int>(uiState.selectedDifficulty);
     const char* difficultyItems[] = {"Simple", "Easy", "Mild", "Moderate", "Hard", "Very Hard", "Fiendish", "Diabolical"};
     if (ImGui::Combo("##difficulty", &difficultyIdx, difficultyItems, 8)) {
-      selectedDifficulty = static_cast<Difficulty>(difficultyIdx);
+      uiState.selectedDifficulty = static_cast<Difficulty>(difficultyIdx);
     }
     ImGui::SameLine(0.0f, 16.0f);
-    ImGui::Text("Mode: %s", ModeName(mode));
+    ImGui::Text("Mode: %s", ModeName(uiState.mode));
 
     if (ImGui::Button("Auto Pencil", ImVec2(140, 34))) {
       requestAutoPencil = true;
@@ -1178,16 +1097,16 @@ int main(int argc, char** argv) {
       requestSolveHiddenSingles = true;
     }
     ImGui::SameLine();
-    if (ImGui::Button(highlightPairs ? "Pairs On" : "Pairs Off", ImVec2(110, 34))) {
-      highlightPairs = !highlightPairs;
-      statusMessage = highlightPairs ? "Pair highlight enabled" : "Pair highlight disabled";
-      statusFrames = 200;
+    if (ImGui::Button(uiState.highlightPairs ? "Pairs On" : "Pairs Off", ImVec2(110, 34))) {
+      uiState.highlightPairs = !uiState.highlightPairs;
+      uiState.statusMessage = uiState.highlightPairs ? "Pair highlight enabled" : "Pair highlight disabled";
+      uiState.statusFrames = 200;
     }
     ImGui::SameLine();
-    if (ImGui::Button(showWrongEntrySlash ? "Slash On" : "Slash Off", ImVec2(105, 34))) {
-      showWrongEntrySlash = !showWrongEntrySlash;
-      statusMessage = showWrongEntrySlash ? "Wrong-entry slash enabled" : "Wrong-entry slash disabled";
-      statusFrames = 200;
+    if (ImGui::Button(uiState.showWrongEntrySlash ? "Slash On" : "Slash Off", ImVec2(105, 34))) {
+      uiState.showWrongEntrySlash = !uiState.showWrongEntrySlash;
+      uiState.statusMessage = uiState.showWrongEntrySlash ? "Wrong-entry slash enabled" : "Wrong-entry slash disabled";
+      uiState.statusFrames = 200;
     }
     ImGui::SameLine();
     if (ImGui::Button("Hint (?)", ImVec2(95, 34))) {
@@ -1199,13 +1118,13 @@ int main(int argc, char** argv) {
     ImGui::End();
 
     if (ImGui::IsKeyPressed(ImGuiKey_Q)) {
-      mode = InputMode::kDigit;
+      uiState.mode = InputMode::kDigit;
     }
     if (ImGui::IsKeyPressed(ImGuiKey_E)) {
-      mode = InputMode::kPencil;
+      uiState.mode = InputMode::kPencil;
     }
     if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-      mode = InputMode::kColor;
+      uiState.mode = InputMode::kColor;
     }
     if (ImGui::IsKeyPressed(ImGuiKey_P)) {
       requestAutoPencil = true;
@@ -1217,9 +1136,9 @@ int main(int argc, char** argv) {
       requestSolveHiddenSingles = true;
     }
     if (ImGui::IsKeyPressed(ImGuiKey_B)) {
-      highlightPairs = !highlightPairs;
-      statusMessage = highlightPairs ? "Pair highlight enabled" : "Pair highlight disabled";
-      statusFrames = 200;
+      uiState.highlightPairs = !uiState.highlightPairs;
+      uiState.statusMessage = uiState.highlightPairs ? "Pair highlight enabled" : "Pair highlight disabled";
+      uiState.statusFrames = 200;
     }
     if (ImGui::IsKeyPressed(ImGuiKey_N)) {
       requestNewPuzzle = true;
@@ -1232,164 +1151,175 @@ int main(int argc, char** argv) {
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_RightArrow) || ImGui::IsKeyPressed(ImGuiKey_D)) {
-      selectedCol = (selectedCol + 1) % kGridSize;
+      uiState.selectedCol = (uiState.selectedCol + 1) % kGridSize;
     }
     if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow) || ImGui::IsKeyPressed(ImGuiKey_A)) {
-      selectedCol = (selectedCol + kGridSize - 1) % kGridSize;
+      uiState.selectedCol = (uiState.selectedCol + kGridSize - 1) % kGridSize;
     }
     if (ImGui::IsKeyPressed(ImGuiKey_DownArrow) || ImGui::IsKeyPressed(ImGuiKey_S)) {
-      selectedRow = (selectedRow + 1) % kGridSize;
+      uiState.selectedRow = (uiState.selectedRow + 1) % kGridSize;
     }
     if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) || ImGui::IsKeyPressed(ImGuiKey_W)) {
-      selectedRow = (selectedRow + kGridSize - 1) % kGridSize;
+      uiState.selectedRow = (uiState.selectedRow + kGridSize - 1) % kGridSize;
     }
 
     if (requestNewPuzzle) {
-      puzzle = GeneratePuzzleWithDifficulty(rng, selectedDifficulty);
-      givens = puzzle;
-      grid = BuildGrid(puzzle);
-      hasSolution = ComputeSolutionFromGivens(givens, solution);
-      undoHistory.clear();
-      currentHint = {};
-      selectedRow = 0;
-      selectedCol = 0;
-      statusMessage = std::string("Generated new ") + DifficultyName(selectedDifficulty) + " puzzle";
-      statusFrames = 240;
+      puzzleState.puzzle = GeneratePuzzleWithDifficulty(rng, uiState.selectedDifficulty);
+      puzzleState.givens = puzzleState.puzzle;
+      puzzleState.grid = BuildGrid(puzzleState.puzzle);
+      puzzleState.hasSolution = ComputeSolutionFromGivens(puzzleState.givens, puzzleState.solution);
+      puzzleState.score = SolveAndScoreDetailed(puzzleState.puzzle);
+
+      // Debug output
+      std::cerr << "Generated puzzle score: " << puzzleState.score.totalScore << std::endl;
+      std::cerr << "  Naked Singles: " << puzzleState.score.nakedSingles << std::endl;
+      std::cerr << "  Hidden Singles: " << puzzleState.score.hiddenSingles << std::endl;
+      std::cerr << "  Pointing Pairs: " << puzzleState.score.pointingPairs << std::endl;
+      std::cerr << "  Box/Line: " << puzzleState.score.boxLineReductions << std::endl;
+      std::cerr << "  Naked Pairs: " << puzzleState.score.nakedPairs << std::endl;
+
+      uiState.undoHistory.clear();
+      uiState.currentHint = {};
+      uiState.selectedRow = 0;
+      uiState.selectedCol = 0;
+      uiState.statusMessage = std::string("Generated new ") + DifficultyName(uiState.selectedDifficulty) + " puzzle";
+      uiState.statusFrames = 240;
     }
     if (requestSnapshot) {
-      snapshotText = SerializeSnapshot(grid, selectedDifficulty, mode, selectedRow, selectedCol,
-                                       highlightPairs, showWrongEntrySlash, currentHint);
-      openSnapshotPopup = true;
-      statusMessage = "Snapshot captured";
-      statusFrames = 200;
+      uiState.snapshotText = SerializeSnapshot(puzzleState.grid, uiState.selectedDifficulty, uiState.mode,
+                                              uiState.selectedRow, uiState.selectedCol,
+                                              uiState.highlightPairs, uiState.showWrongEntrySlash, uiState.currentHint);
+      uiState.openSnapshotPopup = true;
+      uiState.statusMessage = "Snapshot captured";
+      uiState.statusFrames = 200;
     }
     if (requestUndo) {
-      currentHint = {};
-      if (UndoLastChange(grid, undoHistory)) {
-        statusMessage = "Undid last change";
+      uiState.currentHint = {};
+      if (UndoLastChange(puzzleState.grid, uiState.undoHistory)) {
+        uiState.statusMessage = "Undid last change";
       } else {
-        statusMessage = "Nothing to undo";
+        uiState.statusMessage = "Nothing to undo";
       }
-      statusFrames = 200;
+      uiState.statusFrames = 200;
     }
     if (requestAutoPencil) {
-      const Grid previous = grid;
-      const int changed = ApplyAutoPencil(grid);
-      currentHint = {};
+      const Grid previous = puzzleState.grid;
+      const int changed = ApplyAutoPencil(puzzleState.grid);
+      uiState.currentHint = {};
       if (changed > 0) {
-        PushUndoState(undoHistory, previous);
+        PushUndoState(uiState.undoHistory, previous);
       }
-      statusMessage = "Auto-pencil updated " + std::to_string(changed) + " cells";
-      statusFrames = 240;
+      uiState.statusMessage = "Auto-pencil updated " + std::to_string(changed) + " cells";
+      uiState.statusFrames = 240;
     }
     if (requestSolveNakedSingles) {
-      const Grid previous = grid;
-      const int placed = AutoSolveNakedSingles(grid);
-      currentHint = {};
+      const Grid previous = puzzleState.grid;
+      const int placed = AutoSolveNakedSingles(puzzleState.grid);
+      uiState.currentHint = {};
       if (placed > 0) {
-        PushUndoState(undoHistory, previous);
+        PushUndoState(uiState.undoHistory, previous);
       }
       if (placed > 0) {
-        statusMessage = "Solved " + std::to_string(placed) + " naked singles";
+        uiState.statusMessage = "Solved " + std::to_string(placed) + " naked singles";
       } else {
-        statusMessage = "No naked singles found";
+        uiState.statusMessage = "No naked singles found";
       }
-      statusFrames = 300;
+      uiState.statusFrames = 300;
     }
     if (requestSolveHiddenSingles) {
-      const Grid previous = grid;
-      const int placed = AutoSolveHiddenSingles(grid);
-      currentHint = {};
+      const Grid previous = puzzleState.grid;
+      const int placed = AutoSolveHiddenSingles(puzzleState.grid);
+      uiState.currentHint = {};
       if (placed > 0) {
-        PushUndoState(undoHistory, previous);
+        PushUndoState(uiState.undoHistory, previous);
       }
       if (placed > 0) {
-        statusMessage = "Solved " + std::to_string(placed) + " hidden singles";
+        uiState.statusMessage = "Solved " + std::to_string(placed) + " hidden singles";
       } else {
-        statusMessage = "No hidden singles found";
+        uiState.statusMessage = "No hidden singles found";
       }
-      statusFrames = 300;
+      uiState.statusFrames = 300;
     }
     if (requestHint) {
-      if (currentHint.revealPhase == 0 || currentHint.revealPhase >= 3) {
-        currentHint = GenerateHint(grid);
-        currentHint.revealPhase = 1;
-        statusMessage = "Hint: " + currentHint.techniqueName;
-        statusFrames = 300;
-        hintPhaseCounter = 0;
-      } else if (currentHint.revealPhase == 1) {
-        currentHint.revealPhase = 2;
-        statusMessage = "Hint: " + currentHint.techniqueName + " (cells highlighted)";
-        statusFrames = 400;
-      } else if (currentHint.revealPhase == 2) {
-        currentHint.revealPhase = 3;
-        statusMessage = "Hint: " + currentHint.techniqueName + " (digits highlighted)";
-        statusFrames = 400;
+      if (uiState.currentHint.revealPhase == 0 || uiState.currentHint.revealPhase >= 3) {
+        uiState.currentHint = GenerateHint(puzzleState.grid);
+        uiState.currentHint.revealPhase = 1;
+        uiState.statusMessage = "Hint: " + uiState.currentHint.techniqueName;
+        uiState.statusFrames = 300;
+        uiState.hintPhaseCounter = 0;
+      } else if (uiState.currentHint.revealPhase == 1) {
+        uiState.currentHint.revealPhase = 2;
+        uiState.statusMessage = "Hint: " + uiState.currentHint.techniqueName + " (cells highlighted)";
+        uiState.statusFrames = 400;
+      } else if (uiState.currentHint.revealPhase == 2) {
+        uiState.currentHint.revealPhase = 3;
+        uiState.statusMessage = "Hint: " + uiState.currentHint.techniqueName + " (digits highlighted)";
+        uiState.statusFrames = 400;
       }
     }
 
-    Cell& selected = grid[selectedRow][selectedCol];
+    Cell& selected = puzzleState.grid[uiState.selectedRow][uiState.selectedCol];
     const bool editable = !selected.fixed;
     const int digit = ReadDigitPress();
 
-    if (editable && mode == InputMode::kDigit) {
+    if (editable && uiState.mode == InputMode::kDigit) {
       if (digit != 0) {
         if (selected.value != digit || selected.pencil.any()) {
-          PushUndoState(undoHistory, grid);
+          PushUndoState(uiState.undoHistory, puzzleState.grid);
           selected.value = digit;
           selected.pencil.reset();
-          RemoveDigitFromPeerPencils(grid, selectedRow, selectedCol, digit);
-          currentHint = {};
+          RemoveDigitFromPeerPencils(puzzleState.grid, uiState.selectedRow, uiState.selectedCol, digit);
+          uiState.currentHint = {};
         }
       }
       if (IsClearPressed()) {
         if (selected.value != 0) {
-          PushUndoState(undoHistory, grid);
+          PushUndoState(uiState.undoHistory, puzzleState.grid);
           selected.value = 0;
-          currentHint = {};
+          uiState.currentHint = {};
         }
       }
     }
-    if (editable && mode == InputMode::kPencil) {
+    if (editable && uiState.mode == InputMode::kPencil) {
       if (digit != 0 && selected.value == 0) {
-        PushUndoState(undoHistory, grid);
+        PushUndoState(uiState.undoHistory, puzzleState.grid);
         selected.pencil.flip(digit - 1);
-        currentHint = {};
+        uiState.currentHint = {};
       }
       if (IsClearPressed()) {
         if (selected.pencil.any()) {
-          PushUndoState(undoHistory, grid);
+          PushUndoState(uiState.undoHistory, puzzleState.grid);
           selected.pencil.reset();
-          currentHint = {};
+          uiState.currentHint = {};
         }
       }
     }
-    if (mode == InputMode::kColor) {
+    if (uiState.mode == InputMode::kColor) {
       if (digit != 0) {
         if (selected.colorTag != digit) {
-          PushUndoState(undoHistory, grid);
+          PushUndoState(uiState.undoHistory, puzzleState.grid);
         }
-        activeColor = digit;
-        selected.colorTag = activeColor;
-        currentHint = {};
+        uiState.activeColor = digit;
+        selected.colorTag = uiState.activeColor;
+        uiState.currentHint = {};
       }
       if (ImGui::IsKeyPressed(ImGuiKey_Space)) {
-        if (selected.colorTag != activeColor) {
-          PushUndoState(undoHistory, grid);
-          selected.colorTag = activeColor;
-          currentHint = {};
+        if (selected.colorTag != uiState.activeColor) {
+          PushUndoState(uiState.undoHistory, puzzleState.grid);
+          selected.colorTag = uiState.activeColor;
+          uiState.currentHint = {};
         }
       }
       if (IsClearPressed()) {
         if (selected.colorTag != 0) {
-          PushUndoState(undoHistory, grid);
+          PushUndoState(uiState.undoHistory, puzzleState.grid);
           selected.colorTag = 0;
-          currentHint = {};
+          uiState.currentHint = {};
         }
       }
     }
 
-    const bool solved = IsSolved(grid);
+    const bool solved = IsSolved(puzzleState.grid);
     const int highlightDigit = selected.value;
 
     ImGui::SetNextWindowPos(ImVec2(14, 128), ImGuiCond_Always);
@@ -1398,48 +1328,59 @@ int main(int argc, char** argv) {
                  ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
                      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
 
-    ImGui::Text("Sudoku Studio - %s", DifficultyName(selectedDifficulty));
+    ImGui::Text("Sudoku Studio - %s", DifficultyName(uiState.selectedDifficulty));
+    ImGui::SameLine();
+
+    // Clickable score display
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+    if (ImGui::Button(("Score: " + std::to_string(puzzleState.score.totalScore)).c_str())) {
+      uiState.openScoreDetailsPopup = true;
+    }
+    ImGui::PopStyleColor(3);
+    ImGui::PopStyleVar();
+
     ImGui::TextColored(ImVec4(0.33f, 0.27f, 0.20f, 1.0f),
                        "Sharp text rendering + menu/toolbar workflow");
 
-    DrawBoard(grid, selectedRow, selectedCol, highlightDigit, mode, activeColor, highlightPairs,
-          showWrongEntrySlash,
-        &solution,
-        hasSolution,
-        undoHistory,
-          solved, currentHint, digitFont, noteFont);
+    DrawBoard(puzzleState.grid, uiState.selectedRow, uiState.selectedCol, highlightDigit, uiState.mode,
+              uiState.activeColor, uiState.highlightPairs, uiState.showWrongEntrySlash,
+              &puzzleState.solution, puzzleState.hasSolution, uiState.undoHistory, solved,
+              uiState.currentHint, digitFont, noteFont);
 
     ImGui::Separator();
     ImGui::Text(
-      "Controls: arrows/WASD move | Q/E/R modes | 1-9 input | 0/Backspace/Delete clear | Ctrl+Z undo | B pairs | ? hint");
-    ImGui::Text("Selected: row %d col %d", selectedRow + 1, selectedCol + 1);
-    DrawTechniquePanel(currentHint);
+        "Controls: arrows/WASD move | Q/E/R modes | 1-9 input | 0/Backspace/Delete clear | Ctrl+Z undo | B pairs | ? hint");
+    ImGui::Text("Selected: row %d col %d", uiState.selectedRow + 1, uiState.selectedCol + 1);
+    DrawTechniquePanel(uiState.currentHint);
 
     if (solved) {
       ImGui::TextColored(ImVec4(0.18f, 0.53f, 0.31f, 1.0f), "Solved: grid is complete and valid.");
-    } else if (currentHint.revealPhase > 0 && !currentHint.techniqueName.empty()) {
-      if (currentHint.revealPhase == 1) {
+    } else if (uiState.currentHint.revealPhase > 0 && !uiState.currentHint.techniqueName.empty()) {
+      if (uiState.currentHint.revealPhase == 1) {
         ImGui::TextColored(ImVec4(0.36f, 0.26f, 0.18f, 1.0f), "Hint: %s",
-                           currentHint.techniqueName.c_str());
-      } else if (currentHint.revealPhase == 2) {
+                           uiState.currentHint.techniqueName.c_str());
+      } else if (uiState.currentHint.revealPhase == 2) {
         ImGui::TextColored(ImVec4(0.36f, 0.26f, 0.18f, 1.0f), "Hint: %s (cells highlighted)",
-                           currentHint.techniqueName.c_str());
+                           uiState.currentHint.techniqueName.c_str());
       } else {
         ImGui::TextColored(ImVec4(0.36f, 0.26f, 0.18f, 1.0f), "Hint: %s (digits highlighted)",
-                           currentHint.techniqueName.c_str());
+                           uiState.currentHint.techniqueName.c_str());
       }
-    } else if (statusFrames > 0) {
-      ImGui::TextColored(ImVec4(0.36f, 0.26f, 0.18f, 1.0f), "%s", statusMessage.c_str());
+    } else if (uiState.statusFrames > 0) {
+      ImGui::TextColored(ImVec4(0.36f, 0.26f, 0.18f, 1.0f), "%s", uiState.statusMessage.c_str());
     } else {
       ImGui::TextUnformatted("Hints active: unit, same digit, and matching pencil-mark highlight");
     }
 
-    if (openSnapshotPopup) {
+    if (uiState.openSnapshotPopup) {
       ImGui::OpenPopup("Board Snapshot");
-      openSnapshotPopup = false;
+      uiState.openSnapshotPopup = false;
     }
     if (requestLoad) {
-      loadErrorMessage.clear();
+      uiState.loadErrorMessage.clear();
       ImGui::OpenPopup("Load Snapshot");
     }
 
@@ -1447,7 +1388,7 @@ int main(int argc, char** argv) {
       ImGui::TextUnformatted("Copy this snapshot into chat with a description of the bug.");
       ImGui::Spacing();
       if (ImGui::Button("Copy to Clipboard", ImVec2(160.0f, 0.0f))) {
-        ImGui::SetClipboardText(snapshotText.c_str());
+        ImGui::SetClipboardText(uiState.snapshotText.c_str());
       }
       ImGui::SameLine();
       if (ImGui::Button("Close", ImVec2(90.0f, 0.0f))) {
@@ -1456,7 +1397,7 @@ int main(int argc, char** argv) {
       ImGui::Spacing();
       ImGui::BeginChild("SnapshotText", ImVec2(720.0f, 420.0f), true,
                         ImGuiWindowFlags_HorizontalScrollbar);
-      ImGui::TextUnformatted(snapshotText.c_str());
+      ImGui::TextUnformatted(uiState.snapshotText.c_str());
       ImGui::EndChild();
       ImGui::EndPopup();
     }
@@ -1464,46 +1405,95 @@ int main(int argc, char** argv) {
     if (ImGui::BeginPopupModal("Load Snapshot", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
       ImGui::TextUnformatted("Paste a snapshot below, then click Load.");
       ImGui::Spacing();
-      ImGui::InputTextMultiline("##loadbuf", loadInputBuf, sizeof(loadInputBuf),
+      ImGui::InputTextMultiline("##loadbuf", uiState.loadInputBuf, uiState.kLoadInputBufSize,
                                 ImVec2(720.0f, 380.0f));
       ImGui::Spacing();
-      if (!loadErrorMessage.empty()) {
-        ImGui::TextColored(ImVec4(0.8f, 0.15f, 0.15f, 1.0f), "%s", loadErrorMessage.c_str());
+      if (!uiState.loadErrorMessage.empty()) {
+        ImGui::TextColored(ImVec4(0.8f, 0.15f, 0.15f, 1.0f), "%s", uiState.loadErrorMessage.c_str());
         ImGui::Spacing();
       }
       if (ImGui::Button("Paste from Clipboard", ImVec2(190.0f, 0.0f))) {
         const char* cb = ImGui::GetClipboardText();
         if (cb) {
-          const size_t len = std::min(strlen(cb), sizeof(loadInputBuf) - 1);
-          memcpy(loadInputBuf, cb, len);
-          loadInputBuf[len] = '\0';
+          const size_t len = std::min(strlen(cb), uiState.kLoadInputBufSize - 1);
+          memcpy(uiState.loadInputBuf, cb, len);
+          uiState.loadInputBuf[len] = '\0';
         }
       }
       ImGui::SameLine();
       if (ImGui::Button("Load", ImVec2(80.0f, 0.0f))) {
-        const SnapshotLoadResult loaded = DeserializeSnapshot(loadInputBuf);
+        const SnapshotLoadResult loaded = DeserializeSnapshot(uiState.loadInputBuf);
         if (!loaded.ok) {
-          loadErrorMessage = loaded.errorMessage;
+          uiState.loadErrorMessage = loaded.errorMessage;
         } else {
-          PushUndoState(undoHistory, grid);
-          grid = loaded.grid;
-          givens = loaded.givens;
-          hasSolution = ComputeSolutionFromGivens(givens, solution);
-          selectedDifficulty = loaded.difficulty;
-          mode = loaded.mode;
-          selectedRow = std::clamp(loaded.selectedRow, 0, 8);
-          selectedCol = std::clamp(loaded.selectedCol, 0, 8);
-          currentHint = loaded.hint;
-          loadErrorMessage.clear();
-          memset(loadInputBuf, 0, sizeof(loadInputBuf));
-          statusMessage = "Snapshot loaded";
-          statusFrames = 240;
+          PushUndoState(uiState.undoHistory, puzzleState.grid);
+          puzzleState.grid = loaded.grid;
+          puzzleState.givens = loaded.givens;
+          puzzleState.hasSolution = ComputeSolutionFromGivens(puzzleState.givens, puzzleState.solution);
+
+          // Re-score the puzzle based on current state
+          Puzzle currentPuzzle{};
+          for (int r = 0; r < kGridSize; ++r) {
+            for (int c = 0; c < kGridSize; ++c) {
+              currentPuzzle[r][c] = puzzleState.givens[r][c];
+            }
+          }
+          puzzleState.score = SolveAndScoreDetailed(currentPuzzle);
+
+          uiState.selectedDifficulty = loaded.difficulty;
+          uiState.mode = loaded.mode;
+          uiState.selectedRow = std::clamp(loaded.selectedRow, 0, 8);
+          uiState.selectedCol = std::clamp(loaded.selectedCol, 0, 8);
+          uiState.currentHint = loaded.hint;
+          uiState.loadErrorMessage.clear();
+          memset(uiState.loadInputBuf, 0, uiState.kLoadInputBufSize);
+          uiState.statusMessage = "Snapshot loaded";
+          uiState.statusFrames = 240;
           ImGui::CloseCurrentPopup();
         }
       }
       ImGui::SameLine();
       if (ImGui::Button("Cancel", ImVec2(80.0f, 0.0f))) {
-        loadErrorMessage.clear();
+        uiState.loadErrorMessage.clear();
+        ImGui::CloseCurrentPopup();
+      }
+      ImGui::EndPopup();
+    }
+
+    if (uiState.openScoreDetailsPopup) {
+      ImGui::OpenPopup("Puzzle Score Details");
+      uiState.openScoreDetailsPopup = false;
+    }
+
+    if (ImGui::BeginPopupModal("Puzzle Score Details", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      ImGui::TextUnformatted("Puzzle Difficulty Breakdown");
+      ImGui::Separator();
+      ImGui::Spacing();
+
+      ImGui::Text("Total Score: %d", puzzleState.score.totalScore);
+      ImGui::Spacing();
+
+      if (puzzleState.score.nakedSingles > 0) {
+        ImGui::Text("Naked Singles:       %4d points", puzzleState.score.nakedSingles);
+      }
+      if (puzzleState.score.hiddenSingles > 0) {
+        ImGui::Text("Hidden Singles:      %4d points", puzzleState.score.hiddenSingles);
+      }
+      if (puzzleState.score.pointingPairs > 0) {
+        ImGui::Text("Pointing Pairs:      %4d points", puzzleState.score.pointingPairs);
+      }
+      if (puzzleState.score.boxLineReductions > 0) {
+        ImGui::Text("Box/Line Reduction:  %4d points", puzzleState.score.boxLineReductions);
+      }
+      if (puzzleState.score.nakedPairs > 0) {
+        ImGui::Text("Naked Pairs:         %4d points", puzzleState.score.nakedPairs);
+      }
+
+      ImGui::Spacing();
+      ImGui::Separator();
+      ImGui::Spacing();
+
+      if (ImGui::Button("Close", ImVec2(90.0f, 0.0f))) {
         ImGui::CloseCurrentPopup();
       }
       ImGui::EndPopup();
@@ -1511,8 +1501,8 @@ int main(int argc, char** argv) {
 
     ImGui::End();
 
-    if (statusFrames > 0) {
-      --statusFrames;
+    if (uiState.statusFrames > 0) {
+      --uiState.statusFrames;
     }
 
     ImGui::PopFont();

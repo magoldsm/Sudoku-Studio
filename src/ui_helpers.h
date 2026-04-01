@@ -1,6 +1,7 @@
 #pragma once
 
 #include "sudoku_core.h"
+#include <imgui.h>
 
 namespace sudoku {
 
@@ -11,5 +12,11 @@ const char* ModeName(InputMode mode);
 const char* DifficultyName(Difficulty difficulty);
 // Renders ordered technique list and highlights the active hint technique.
 void DrawTechniquePanel(const Hint& currentHint);
+
+// Drawing helpers
+void DrawColorTagPanel(int& activeColor, InputMode mode,
+                       const std::array<ImU32, 10>& tagColors);
+
+void DrawGridLines(ImDrawList* draw, const ImVec2& origin, const ImVec2& boardMax);
 
 }  // namespace sudoku

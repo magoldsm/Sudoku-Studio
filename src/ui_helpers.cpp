@@ -4,6 +4,8 @@
 #include <string>
 
 #include "imgui.h"
+#include "ui_constants.h"
+#include "sudoku_core.h"
 
 namespace sudoku {
 // Extracted from main.cpp during modular refactor.
@@ -116,4 +118,43 @@ void DrawTechniquePanel(const Hint& currentHint) {
   ImGui::TextDisabled("[8] Forcing Chains");
   ImGui::EndChild();
 }
+
+void DrawColorTagPanel(int& activeColor, InputMode mode,
+                       const std::array<ImU32, 10>& tagColors) {
+  ImGui::BeginChild("TagPanel", ImVec2(kTagPanelWidth, kBoardSize + 18.0f), true,
+                    ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar);
+
+  ImGui::TextUnformatted("Color Tags");
+  ImGui::Spacing();
+  for (int tag = 1; tag <= 9; ++tag) {
+    ImGui::PushID(tag);
+    if (mode == InputMode::kColor && activeColor == tag) {
+      ImGui::PushStyleColor(ImGuiCol_Button, kColorActiveButtonOverride);
+    } else {
+      const ImVec4 c = ImGui::ColorConvertU32ToFloat4(tagColors[tag]);
+      ImGui::PushStyleColor(ImGuiCol_Button, c);
+    }
+
+    if (ImGui::Button(std::to_string(tag).c_str(), ImVec2(kTagButtonWidth, kTagButtonHeight))) {
+      activeColor = tag;
+    }
+    ImGui::PopStyleColor();
+    ImGui::PopID();
+  }
+
+  ImGui::EndChild();
+}
+
+void DrawGridLines(ImDrawList* draw, const ImVec2& origin, const ImVec2& boardMax) {
+  for (int i = 0; i <= kGridSize; ++i) {
+    const float x = origin.x + i * kCellSize;
+    const float y = origin.y + i * kCellSize;
+    const float thickness = (i % 3 == 0) ? kGridThickLineWidth : kGridThinLineWidth;
+    const ImU32 color = (i % 3 == 0) ? kGridThickLineColor : kGridThinLineColor;
+
+    draw->AddLine(ImVec2(x, origin.y), ImVec2(x, boardMax.y), color, thickness);
+    draw->AddLine(ImVec2(origin.x, y), ImVec2(boardMax.x, y), color, thickness);
+  }
+}
+
 }  // namespace sudoku
