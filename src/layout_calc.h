@@ -22,10 +22,14 @@ constexpr float kBoardAreaWidth = kBoardSize + 2.0f * kBoardAreaPaddingX;   // 6
 constexpr float kBoardAreaHeight = kBoardSize + 2.0f * kBoardAreaPaddingY;  // 666
 
 // --- COLOR TAGS PANEL ---
-// 9 color buttons (1-9), increased height to fit DPI-scaled digit fonts
-// At 1.5x DPI: digits need ~40-45px height
+// 9 color buttons (1-9)
+// Button height: Windows (high DPI) needs more height, Linux can use original
 constexpr float kTagButtonWidth = 108.0f;
-constexpr float kTagButtonHeight = 48.0f;   // Increased from 30 to fit scaled fonts
+#ifdef _WIN32
+  constexpr float kTagButtonHeight = 48.0f;   // Windows: accommodate scaled digit fonts
+#else
+  constexpr float kTagButtonHeight = 30.0f;   // Linux: original size
+#endif
 constexpr float kTagButtonMargin = 8.0f;
 constexpr int kTagCount = 9;
 // Panel width: button width + padding on sides
@@ -53,26 +57,32 @@ constexpr float kWorkspaceContentWidth =
     kTechniquePanelWidth;  // 1128
 
 // Vertical layout: [Title section] [Board + Panels] [Control section]
-// Text line height accounts for DPI scaling (base ~24px, scales to 30-36px at 1.5x-1.5x DPI)
-constexpr float kTextLineHeight = 32.0f;   // Increased to accommodate scaled fonts
-constexpr float kSeparatorHeight = 12.0f;  // Increased spacing
-constexpr float kSectionSpacingV = 12.0f;
+// Text line height and spacing: Windows (high DPI) needs more space, Linux can use original
+#ifdef _WIN32
+  constexpr float kTextLineHeight = 32.0f;   // Windows: accommodate scaled fonts
+  constexpr float kSeparatorHeight = 12.0f;
+  constexpr float kSectionSpacingV = 12.0f;
+  constexpr float kWorkspacePaddingV = 24.0f;
+#else
+  constexpr float kTextLineHeight = 24.0f;   // Linux: original size
+  constexpr float kSeparatorHeight = 8.0f;
+  constexpr float kSectionSpacingV = 8.0f;
+  constexpr float kWorkspacePaddingV = 16.0f;
+#endif
 
 // Title section: "Sudoku Studio - [Difficulty] Score: [Score]" + "Sharp text..." + spacing
-constexpr float kTitleSectionHeight = 3.0f * kTextLineHeight + kSectionSpacingV;  // 108
+constexpr float kTitleSectionHeight = 3.0f * kTextLineHeight + kSectionSpacingV;
 
 // Control section: "Controls:" line, "Selected:" line, Status line + spacing
-constexpr float kControlSectionHeight = 3.0f * kTextLineHeight + 2.0f * kSectionSpacingV;  // 120
+constexpr float kControlSectionHeight = 3.0f * kTextLineHeight + 2.0f * kSectionSpacingV;
 
 // Total workspace content height:
-// Title (108) + Board (666) + Separator (12) + Controls (120) + Padding (24) = 930
-constexpr float kWorkspacePaddingV = 24.0f;   // top/bottom padding
 constexpr float kWorkspaceContentHeight =
     kTitleSectionHeight +
     kBoardAreaHeight +
     kSeparatorHeight +
     kControlSectionHeight +
-    kWorkspacePaddingV;  // 930
+    kWorkspacePaddingV;
 
 // Workspace window is positioned below menu + toolbar
 constexpr float kWorkspaceWindowWidth = kWorkspaceContentWidth;

@@ -43,11 +43,20 @@ constexpr float kPencilMarkStartY = 7.0f;
 constexpr float kPencilMarkSpacingX = 23.0f;
 constexpr float kPencilMarkSpacingY = 20.0f;
 
-// Font sizes (scaled by DPI: 1.0x = 96 DPI, 1.5x = 144 DPI, 2.0x = 192 DPI)
-// At 1.5x DPI: UI=24pt, Digit=36pt, Pencil=24pt
-constexpr float kUIFontSize = 16.0f;      // 1.5x DPI → 24pt
-constexpr float kDigitFontSize = 24.0f;   // 1.5x DPI → 36pt
-constexpr float kPencilMarkFontSize = 16.0f;  // 1.5x DPI → 24pt
+// Font sizes (scaled by DPI)
+// Windows (high DPI): smaller base sizes that scale up nicely
+// Linux/WSL (typically 1x DPI): larger base sizes for readability
+#ifdef _WIN32
+  // Windows: scaled by DPI (1.5x = 24pt, 2.0x = 32pt)
+  constexpr float kUIFontSize = 16.0f;
+  constexpr float kDigitFontSize = 24.0f;
+  constexpr float kPencilMarkFontSize = 16.0f;
+#else
+  // Linux/WSL/macOS: typically 1x DPI, use original larger sizes
+  constexpr float kUIFontSize = 22.0f;
+  constexpr float kDigitFontSize = 40.0f;
+  constexpr float kPencilMarkFontSize = 16.0f;
+#endif
 
 // Tag and Technique panels (computed from layout_calc.h)
 constexpr float kTagPanelWidth = Layout::kTagPanelWidth;
