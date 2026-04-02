@@ -27,6 +27,10 @@ struct UIState {
   InputMode mode = InputMode::kDigit;
   Difficulty selectedDifficulty = Difficulty::kHard;
 
+  // Digit highlighting and effects (0 = none, 1-9 = digit)
+  int showPositionDigit = 0;  // Highlight all cells with this digit
+  int showEffectDigit = 0;    // Show blue slashes for impossible cells of this digit
+
   // Undo/redo history
   std::vector<Grid> undoHistory;
 

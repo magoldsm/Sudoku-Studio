@@ -15,8 +15,11 @@ const char* DifficultyName(Difficulty difficulty);
 void DrawTechniquePanel(const Hint& currentHint, float width = 0.0f);
 
 // Drawing helpers
-void DrawColorTagPanel(int& activeColor, InputMode& mode,
-                       const std::array<ImU32, 10>& tagColors);
+void DrawColorTagPanel(Grid& grid,
+                       int& activeColor, InputMode& mode,
+                       const std::array<ImU32, 10>& tagColors,
+                       int& showPositionDigit, int& showEffectDigit,
+                       bool& highlightPairs);
 
 void DrawGridLines(ImDrawList* draw, const ImVec2& origin, const ImVec2& boardMax);
 

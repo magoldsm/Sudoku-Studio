@@ -1,14 +1,15 @@
 #pragma once
 
 #include <imgui.h>
+#include "layout_calc.h"
 
 namespace sudoku {
 
-// Window dimensions
-constexpr float kWindowWidth = 1150.0f;  // Board + Color Tags + Technique Panel + margins
-constexpr float kWindowHeight = 940.0f;   // Menu (24) + Toolbar (96) + Board + Controls + padding
-constexpr float kToolbarHeight = 96.0f;
-constexpr float kMainMenuHeight = 24.0f;
+// Window dimensions (computed from layout_calc.h)
+constexpr float kWindowWidth = Layout::kWindowWidth;
+constexpr float kWindowHeight = Layout::kWindowHeight;
+constexpr float kToolbarHeight = Layout::kToolbarHeight;
+constexpr float kMainMenuHeight = Layout::kMainMenuBarHeight;
 
 // Board styling
 constexpr ImU32 kCellBackgroundColor = IM_COL32(253, 251, 246, 255);
@@ -47,17 +48,17 @@ constexpr float kUIFontSize = 22.0f;
 constexpr float kDigitFontSize = 40.0f;
 constexpr float kPencilMarkFontSize = 16.0f;
 
-// Tag and Technique panels
-constexpr float kTagPanelWidth = 164.0f;
-constexpr float kTechniquePanelWidth = 280.0f;  // Wide enough to read full technique names
-constexpr float kTagButtonWidth = 108.0f;
-constexpr float kTagButtonHeight = 30.0f;
+// Tag and Technique panels (computed from layout_calc.h)
+constexpr float kTagPanelWidth = Layout::kTagPanelWidth;
+constexpr float kTechniquePanelWidth = Layout::kTechniquePanelWidth;
+constexpr float kTagButtonWidth = Layout::kTagButtonWidth;
+constexpr float kTagButtonHeight = Layout::kTagButtonHeight;
 constexpr ImVec4 kColorActiveButtonOverride = ImVec4(0.24f, 0.52f, 0.72f, 1.0f);
 
-// Board panel margin
-constexpr float kBoardPanelMargin = 12.0f;
-constexpr float kBoardPanelPaddingX = 6.0f;
-constexpr float kBoardPanelPaddingY = 9.0f;
+// Board panel margin and padding (computed from layout_calc.h)
+constexpr float kBoardPanelMargin = Layout::kPanelMargin;
+constexpr float kBoardPanelPaddingX = Layout::kBoardAreaPaddingX;
+constexpr float kBoardPanelPaddingY = Layout::kBoardAreaPaddingY;
 
 // Cell highlight radius
 constexpr float kCellBorderRadius = 6.0f;

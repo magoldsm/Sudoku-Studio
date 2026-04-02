@@ -252,7 +252,7 @@ Hint DetectPointingPairs(const CandidateGrid& candidates) {
           sameCol = sameCol && (cell.col == boxCells.front().col);
         }
 
-        std::vector<HintCell> affected = boxCells;
+        std::vector<HintCell> affected;
         bool hasElimination = false;
         if (sameRow) {
           const int row = boxCells.front().row;
@@ -269,6 +269,11 @@ Hint DetectPointingPairs(const CandidateGrid& candidates) {
             if (!appearsOnlyInThisRow) break;
           }
           if (appearsOnlyInThisRow) {
+            // Add pointing cells to show where digit is confined
+            for (const HintCell& cell : boxCells) {
+              AddUniqueCell(affected, cell.row, cell.col);
+            }
+            // Add elimination cells
             for (int col = 0; col < kGridSize; ++col) {
               if (col >= startCol && col < startCol + 3) {
                 continue;
@@ -295,6 +300,11 @@ Hint DetectPointingPairs(const CandidateGrid& candidates) {
             if (!appearsOnlyInThisCol) break;
           }
           if (appearsOnlyInThisCol) {
+            // Add pointing cells to show where digit is confined
+            for (const HintCell& cell : boxCells) {
+              AddUniqueCell(affected, cell.row, cell.col);
+            }
+            // Add elimination cells
             for (int row = 0; row < kGridSize; ++row) {
               if (row >= startRow && row < startRow + 3) {
                 continue;
@@ -1569,6 +1579,9 @@ int ApplyAutoPencil(Grid& grid) {
           // No marks yet: fill with legal candidates
           next = legalCandidates;
         }
+      } else {
+        // Cell is solved: clear pencil marks
+        next.reset();
       }
       if (cell.pencil != next) {
         cell.pencil = next;
@@ -2832,9 +2845,12 @@ Hint GenerateHint(const Grid& grid) {
   };
 
   // Ordered from easier/common techniques to heavier analysis.
-  const std::array<Hint (*)(const CandidateGrid&), 10> detectors = {
-      DetectNakedSingles,
-      DetectHiddenSingles,
+  // For basic techniques, return hints directly from detectors since they're based on
+  // rebuild legal candidates (BuildFullCandidateGrid). Pencil marks may not be in sync.
+  if (Hint h = DetectNakedSingles(candidates); h.IsValid()) return h;
+  if (Hint h = DetectHiddenSingles(candidates); h.IsValid()) return h;
+
+  const std::array<Hint (*)(const CandidateGrid&), 8> detectors = {
       DetectPointingPairs,
       DetectBoxLineReduction,
       [](const CandidateGrid& c) { return DetectNakedSubset(c, 2, "Naked Pair"); },
