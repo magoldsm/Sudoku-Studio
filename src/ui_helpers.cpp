@@ -119,25 +119,35 @@ void DrawTechniquePanel(const Hint& currentHint) {
   ImGui::EndChild();
 }
 
-void DrawColorTagPanel(int& activeColor, InputMode mode,
+void DrawColorTagPanel(int& activeColor, InputMode& mode,
                        const std::array<ImU32, 10>& tagColors) {
   ImGui::BeginChild("TagPanel", ImVec2(kTagPanelWidth, kBoardSize + 18.0f), true,
                     ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar);
 
   ImGui::TextUnformatted("Color Tags");
   ImGui::Spacing();
+
+  ImDrawList* draw = ImGui::GetWindowDrawList();
+
   for (int tag = 1; tag <= 9; ++tag) {
     ImGui::PushID(tag);
-    if (mode == InputMode::kColor && activeColor == tag) {
-      ImGui::PushStyleColor(ImGuiCol_Button, kColorActiveButtonOverride);
-    } else {
-      const ImVec4 c = ImGui::ColorConvertU32ToFloat4(tagColors[tag]);
-      ImGui::PushStyleColor(ImGuiCol_Button, c);
-    }
+    const ImVec4 c = ImGui::ColorConvertU32ToFloat4(tagColors[tag]);
+    ImGui::PushStyleColor(ImGuiCol_Button, c);
 
     if (ImGui::Button(std::to_string(tag).c_str(), ImVec2(kTagButtonWidth, kTagButtonHeight))) {
       activeColor = tag;
+      mode = InputMode::kColor;  // Auto-switch to color mode when color is clicked
     }
+
+    // Draw border around active color tag
+    if (mode == InputMode::kColor && activeColor == tag) {
+      ImVec2 buttonMin = ImGui::GetItemRectMin();
+      ImVec2 buttonMax = ImGui::GetItemRectMax();
+      constexpr ImU32 borderColor = IM_COL32(30, 100, 210, 255);  // Bright blue
+      constexpr float borderThickness = 3.0f;
+      draw->AddRect(buttonMin, buttonMax, borderColor, 0.0f, 0, borderThickness);
+    }
+
     ImGui::PopStyleColor();
     ImGui::PopID();
   }

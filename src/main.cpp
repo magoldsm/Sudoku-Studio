@@ -28,15 +28,15 @@ constexpr size_t kMaxUndoHistory = 256;
 
 constexpr std::array<ImU32, 10> kTagColors = {
     0U,
-    IM_COL32(254, 205, 211, 255),
-    IM_COL32(254, 240, 138, 255),
-    IM_COL32(220, 252, 231, 255),
-    IM_COL32(224, 242, 254, 255),
-    IM_COL32(233, 213, 255, 255),
-    IM_COL32(254, 215, 170, 255),
-    IM_COL32(199, 210, 254, 255),
-    IM_COL32(191, 219, 254, 255),
-    IM_COL32(217, 249, 157, 255),
+    IM_COL32(254, 205, 211, 255),  // 1: Light Red
+    IM_COL32(254, 240, 138, 255),  // 2: Light Yellow
+    IM_COL32(220, 252, 231, 255),  // 3: Light Green
+    IM_COL32(224, 242, 254, 255),  // 4: Light Blue
+    IM_COL32(233, 213, 255, 255),  // 5: Light Purple
+    IM_COL32(254, 215, 170, 255),  // 6: Light Orange
+    IM_COL32(200, 245, 255, 255),  // 7: Light Cyan (was similar blue)
+    IM_COL32(255, 245, 200, 255),  // 8: Light Tan/Beige (was similar blue)
+    IM_COL32(217, 249, 157, 255),  // 9: Light Green-Yellow
 };
 
   void PushUndoState(std::vector<Grid>& undoHistory, const Grid& grid) {
@@ -707,7 +707,7 @@ void DrawBoard(Grid& grid,
                int& selectedRow,
                int& selectedCol,
                int highlightDigit,
-               InputMode mode,
+               InputMode& mode,
                int& activeColor,
                bool highlightPairs,
                bool showWrongEntrySlash,
@@ -725,25 +725,63 @@ void DrawBoard(Grid& grid,
   const ImVec2 boardMax(origin.x + kBoardSize, origin.y + kBoardSize);
   ImGui::InvisibleButton("board_canvas", ImVec2(kBoardSize, kBoardSize));
 
+  // Track double-click for color mode
+  static int lastClickedRow = -1;
+  static int lastClickedCol = -1;
+  static float lastClickTime = 0.0f;
+  constexpr float kDoubleClickThreshold = 0.3f;  // 300ms
+
   if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
     const ImVec2 mouse = ImGui::GetIO().MousePos;
     const int clickedCol = static_cast<int>((mouse.x - origin.x) / kCellSize);
     const int clickedRow = static_cast<int>((mouse.y - origin.y) / kCellSize);
-    selectedCol = clickedCol;
-    selectedRow = clickedRow;
-    selectedCol = std::clamp(selectedCol, 0, 8);
-    selectedRow = std::clamp(selectedRow, 0, 8);
+    int clampedCol = std::clamp(clickedCol, 0, 8);
+    int clampedRow = std::clamp(clickedRow, 0, 8);
 
-    Cell& clickedCell = grid[selectedRow][selectedCol];
-    if (mode == InputMode::kPencil && !clickedCell.fixed && clickedCell.value == 0) {
-      const float localX = mouse.x - (origin.x + static_cast<float>(clickedCol) * kCellSize);
-      const float localY = mouse.y - (origin.y + static_cast<float>(clickedRow) * kCellSize);
-      const int subCol = std::clamp(static_cast<int>((localX / kCellSize) * 3.0f), 0, 2);
-      const int subRow = std::clamp(static_cast<int>((localY / kCellSize) * 3.0f), 0, 2);
-      const int markDigit = subRow * 3 + subCol + 1;
-      if (clickedCell.pencil.test(markDigit - 1)) {
-        PushUndoState(undoHistory, grid);
-        clickedCell.pencil.reset(markDigit - 1);
+    // Detect double-click in color mode
+    const float currentTime = ImGui::GetTime();
+    const bool isDoubleClick = (mode == InputMode::kColor &&
+                                lastClickedRow == clampedRow &&
+                                lastClickedCol == clampedCol &&
+                                (currentTime - lastClickTime) < kDoubleClickThreshold);
+
+    lastClickedRow = clampedRow;
+    lastClickedCol = clampedCol;
+    lastClickTime = currentTime;
+
+    // In color mode: single-click to apply color, double-click to remove
+    if (mode == InputMode::kColor) {
+      Cell& clickedCell = grid[clampedRow][clampedCol];
+      if (isDoubleClick) {
+        // Double-click: remove color
+        if (clickedCell.colorTag != 0) {
+          PushUndoState(undoHistory, grid);
+          clickedCell.colorTag = 0;
+        }
+      } else {
+        // Single-click: apply color (don't select the cell)
+        if (clickedCell.colorTag != activeColor) {
+          PushUndoState(undoHistory, grid);
+          clickedCell.colorTag = activeColor;
+        }
+      }
+      // Don't select the cell in color mode
+    } else {
+      // Non-color modes: always select the cell
+      selectedCol = clampedCol;
+      selectedRow = clampedRow;
+
+      Cell& clickedCell = grid[selectedRow][selectedCol];
+      if (mode == InputMode::kPencil && !clickedCell.fixed && clickedCell.value == 0) {
+        const float localX = mouse.x - (origin.x + static_cast<float>(clickedCol) * kCellSize);
+        const float localY = mouse.y - (origin.y + static_cast<float>(clickedRow) * kCellSize);
+        const int subCol = std::clamp(static_cast<int>((localX / kCellSize) * 3.0f), 0, 2);
+        const int subRow = std::clamp(static_cast<int>((localY / kCellSize) * 3.0f), 0, 2);
+        const int markDigit = subRow * 3 + subCol + 1;
+        if (clickedCell.pencil.test(markDigit - 1)) {
+          PushUndoState(undoHistory, grid);
+          clickedCell.pencil.reset(markDigit - 1);
+        }
       }
     }
   }
@@ -1160,6 +1198,7 @@ int main(int argc, char** argv) {
   ImGui::CreateContext();
   ImGuiIO& io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+  io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;  // Disable ImGui cursor management
 
   ConfigureStyle();
 
@@ -1263,10 +1302,43 @@ int main(int argc, char** argv) {
   uiState.statusMessage = "Menu/toolbar enabled. Ctrl+Z undo, P auto-pencil, K naked singles, H hidden singles";
   uiState.statusFrames = 480;
 
+  // Create standard cursors for different modes (lazy initialization)
+  GLFWcursor* cursorArrow = nullptr;
+  GLFWcursor* cursorCrosshair = nullptr;
+  GLFWcursor* cursorHand = nullptr;
+  bool cursorsInitialized = false;
+
   while (!glfwWindowShouldClose(window)) {
+    // Create cursors on first loop iteration
+    if (!cursorsInitialized) {
+      cursorArrow = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
+      cursorCrosshair = glfwCreateStandardCursor(GLFW_CROSSHAIR_CURSOR);
+      cursorHand = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
+      cursorsInitialized = true;
+    }
     glfwPollEvents();
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
+
+    // Set cursor based on mode (when mode changes)
+    // Note: This may not work on all platforms (Linux/WSL2 cursor handling is inconsistent)
+    static InputMode lastMode = static_cast<InputMode>(-1);
+    if (uiState.mode != lastMode) {
+      lastMode = uiState.mode;
+
+      switch (uiState.mode) {
+        case InputMode::kDigit:
+          glfwSetCursor(window, cursorCrosshair);
+          break;
+        case InputMode::kPencil:
+          glfwSetCursor(window, cursorHand);
+          break;
+        case InputMode::kColor:
+          glfwSetCursor(window, cursorArrow);
+          break;
+      }
+    }
+
     ImGui::NewFrame();
 
     ImGui::PushFont(uiFont);
@@ -1467,6 +1539,7 @@ int main(int argc, char** argv) {
       requestSolveHiddenSingles = true;
     }
     if (ImGui::IsKeyPressed(ImGuiKey_B)) {
+      uiState.mode = InputMode::kDigit;  // Exit color mode
       uiState.highlightPairs = !uiState.highlightPairs;
       uiState.statusMessage = uiState.highlightPairs ? "Pair highlight enabled" : "Pair highlight disabled";
       uiState.statusFrames = 200;
@@ -1496,6 +1569,7 @@ int main(int argc, char** argv) {
     }
 
     if (requestNewPuzzle) {
+      uiState.mode = InputMode::kDigit;  // Exit color mode
       puzzleState.puzzle = GeneratePuzzleWithDifficulty(rng, uiState.selectedDifficulty);
       puzzleState.givens = puzzleState.puzzle;
       puzzleState.grid = BuildGrid(puzzleState.puzzle);
@@ -1550,6 +1624,7 @@ int main(int argc, char** argv) {
       uiState.statusFrames = 200;
     }
     if (requestAutoPencil) {
+      uiState.mode = InputMode::kDigit;  // Exit color mode
       const Grid previous = puzzleState.grid;
       const int changed = ApplyAutoPencil(puzzleState.grid);
       uiState.currentHint = {};
@@ -1560,6 +1635,7 @@ int main(int argc, char** argv) {
       uiState.statusFrames = 240;
     }
     if (requestSolveNakedSingles) {
+      uiState.mode = InputMode::kDigit;  // Exit color mode
       const Grid previous = puzzleState.grid;
       const int placed = AutoSolveNakedSingles(puzzleState.grid);
       uiState.currentHint = {};
@@ -1574,6 +1650,7 @@ int main(int argc, char** argv) {
       uiState.statusFrames = 300;
     }
     if (requestSolveHiddenSingles) {
+      uiState.mode = InputMode::kDigit;  // Exit color mode
       const Grid previous = puzzleState.grid;
       const int placed = AutoSolveHiddenSingles(puzzleState.grid);
       uiState.currentHint = {};
@@ -1588,6 +1665,7 @@ int main(int argc, char** argv) {
       uiState.statusFrames = 300;
     }
     if (requestHint) {
+      uiState.mode = InputMode::kDigit;  // Exit color mode
       if (uiState.currentHint.revealPhase == 0 || uiState.currentHint.revealPhase >= 3) {
         uiState.currentHint = GenerateHint(puzzleState.grid);
         uiState.currentHint.revealPhase = 1;
@@ -1651,21 +1729,27 @@ int main(int argc, char** argv) {
     }
     if (uiState.mode == InputMode::kColor) {
       if (digit != 0) {
-        if (selected.colorTag != digit) {
-          PushUndoState(uiState.undoHistory, puzzleState.grid);
-        }
+        // In color mode, digits just change the active color
         uiState.activeColor = digit;
-        selected.colorTag = uiState.activeColor;
-        uiState.currentHint = {};
       }
       if (ImGui::IsKeyPressed(ImGuiKey_Space)) {
-        if (selected.colorTag != uiState.activeColor) {
+        // Space toggles the active color on/off on the selected cell
+        if (selected.colorTag == uiState.activeColor) {
+          // Already has this color, remove it
+          if (selected.colorTag != 0) {
+            PushUndoState(uiState.undoHistory, puzzleState.grid);
+            selected.colorTag = 0;
+            uiState.currentHint = {};
+          }
+        } else {
+          // Apply the active color
           PushUndoState(uiState.undoHistory, puzzleState.grid);
           selected.colorTag = uiState.activeColor;
           uiState.currentHint = {};
         }
       }
       if (IsClearPressed()) {
+        // Clear removes color from selected cell
         if (selected.colorTag != 0) {
           PushUndoState(uiState.undoHistory, puzzleState.grid);
           selected.colorTag = 0;
@@ -1923,6 +2007,11 @@ int main(int argc, char** argv) {
   ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
+
+  // Clean up cursors (if they were created)
+  if (cursorArrow) glfwDestroyCursor(cursorArrow);
+  if (cursorCrosshair) glfwDestroyCursor(cursorCrosshair);
+  if (cursorHand) glfwDestroyCursor(cursorHand);
 
   glfwDestroyWindow(window);
   glfwTerminate();
