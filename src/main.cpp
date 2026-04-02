@@ -2,6 +2,7 @@
 #include <array>
 #include <atomic>
 #include <bitset>
+#include <filesystem>
 #include <iostream>
 #include <mutex>
 #include <random>
@@ -1165,31 +1166,65 @@ int main(int argc, char** argv) {
   ImGui_ImplGlfw_InitForOpenGL(window, true);
   ImGui_ImplOpenGL3_Init(glslVersion);
 
+  // Font search paths — include Windows, macOS, and Linux
   std::vector<std::string> fontCandidates = {
+      // Windows
+      "C:\\Windows\\Fonts\\segoeui.ttf",
+      "C:\\Windows\\Fonts\\arial.ttf",
+      "C:\\Windows\\Fonts\\verdana.ttf",
+      // macOS
+      "/Library/Fonts/Arial.ttf",
+      "/System/Library/Fonts/Helvetica.ttc",
+      // Linux
       "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
       "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
       "/usr/share/fonts/TTF/DejaVuSans.ttf",
   };
+
+  // Detect DPI scaling from monitor
+  float dpiScale = 1.0f;
+  GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+  if (primaryMonitor != nullptr) {
+    float xScale, yScale;
+    glfwGetMonitorContentScale(primaryMonitor, &xScale, &yScale);
+    dpiScale = (xScale + yScale) / 2.0f;  // Average of x and y scale
+    std::cerr << "Detected DPI scale: " << dpiScale << " (xScale: " << xScale << ", yScale: " << yScale << ")" << std::endl;
+  } else {
+    std::cerr << "Warning: Could not detect primary monitor, using default DPI scale of 1.0" << std::endl;
+  }
+
+  // Calculate DPI-scaled font sizes
+  const float scaledUIFontSize = kUIFontSize * dpiScale;
+  const float scaledDigitFontSize = kDigitFontSize * dpiScale;
+  const float scaledPencilMarkFontSize = kPencilMarkFontSize * dpiScale;
+
+  std::cerr << "Using scaled font sizes - UI: " << scaledUIFontSize << "pt, Digit: " << scaledDigitFontSize
+            << "pt, Pencil: " << scaledPencilMarkFontSize << "pt" << std::endl;
 
   ImFont* uiFont = nullptr;
   ImFont* digitFont = nullptr;
   ImFont* noteFont = nullptr;
 
   for (const std::string& fontPath : fontCandidates) {
+    // Check if file exists before trying to load (avoid ImGui assertion)
+    if (!std::filesystem::exists(fontPath)) {
+      continue;
+    }
+
     if (uiFont == nullptr) {
-      uiFont = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), kUIFontSize);
+      uiFont = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), scaledUIFontSize);
       if (uiFont != nullptr) {
         std::cerr << "Loaded UI font from: " << fontPath << std::endl;
       }
     }
     if (digitFont == nullptr) {
-      digitFont = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), kDigitFontSize);
+      digitFont = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), scaledDigitFontSize);
       if (digitFont != nullptr) {
         std::cerr << "Loaded digit font from: " << fontPath << std::endl;
       }
     }
     if (noteFont == nullptr) {
-      noteFont = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), kPencilMarkFontSize);
+      noteFont = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), scaledPencilMarkFontSize);
       if (noteFont != nullptr) {
         std::cerr << "Loaded note font from: " << fontPath << std::endl;
       }
@@ -1202,8 +1237,10 @@ int main(int argc, char** argv) {
   }
 
   if (uiFont == nullptr || digitFont == nullptr || noteFont == nullptr) {
-    std::cerr << "Warning: Could not load custom fonts. Using ImGui default font." << std::endl;
-    ImFont* defaultFont = io.Fonts->AddFontDefault();
+    std::cerr << "Warning: Could not load custom fonts. Using ImGui default font (scaled by DPI: " << dpiScale << "x)." << std::endl;
+    ImFontConfig config;
+    config.SizePixels = scaledUIFontSize;
+    ImFont* defaultFont = io.Fonts->AddFontDefault(&config);
     if (uiFont == nullptr) uiFont = defaultFont;
     if (digitFont == nullptr) digitFont = defaultFont;
     if (noteFont == nullptr) noteFont = defaultFont;
