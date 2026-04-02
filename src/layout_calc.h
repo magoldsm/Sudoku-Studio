@@ -64,17 +64,18 @@ constexpr float kWorkspaceContentWidth =
   constexpr float kSectionSpacingV = 12.0f;
   constexpr float kWorkspacePaddingV = 24.0f;
 #else
-  constexpr float kTextLineHeight = 24.0f;   // Linux: original size
-  constexpr float kSeparatorHeight = 8.0f;
-  constexpr float kSectionSpacingV = 8.0f;
-  constexpr float kWorkspacePaddingV = 16.0f;
+  constexpr float kTextLineHeight = 28.0f;   // Linux: increase from 24 for better spacing
+  constexpr float kSeparatorHeight = 12.0f;
+  constexpr float kSectionSpacingV = 10.0f;
+  constexpr float kWorkspacePaddingV = 20.0f;
 #endif
 
 // Title section: "Sudoku Studio - [Difficulty] Score: [Score]" + "Sharp text..." + spacing
 constexpr float kTitleSectionHeight = 3.0f * kTextLineHeight + kSectionSpacingV;
 
-// Control section: "Controls:" line, "Selected:" line, Status line + spacing
-constexpr float kControlSectionHeight = 3.0f * kTextLineHeight + 2.0f * kSectionSpacingV;
+// Control section: "Controls:" line, "Selected:" line, "Hint:" line, Status line + spacing
+// Increased to 4 lines to account for all content
+constexpr float kControlSectionHeight = 4.0f * kTextLineHeight + 2.0f * kSectionSpacingV;
 
 // Total workspace content height:
 constexpr float kWorkspaceContentHeight =
