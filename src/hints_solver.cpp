@@ -1477,9 +1477,8 @@ int ApplyNakedSingles(Grid& grid) {
         continue;
       }
 
-      // Use user's pencil marks if available, otherwise compute legal candidates
-      const std::bitset<9> candidates =
-          cell.pencil.any() ? cell.pencil : ComputeCandidates(grid, row, col);
+      // Always use legal candidates. Pencil marks may be stale/incomplete.
+      const std::bitset<9> candidates = ComputeCandidates(grid, row, col);
       if (candidates.count() != 1) {
         continue;
       }
@@ -1509,9 +1508,8 @@ int ApplyHiddenSingles(Grid& grid) {
         if (grid[row][col].value != 0) {
           continue;
         }
-        // Use user's pencil marks if available, otherwise compute legal candidates
-        const std::bitset<9> candidates =
-            grid[row][col].pencil.any() ? grid[row][col].pencil : ComputeCandidates(grid, row, col);
+        // Always use legal candidates. Pencil marks may be stale/incomplete.
+        const std::bitset<9> candidates = ComputeCandidates(grid, row, col);
         if (candidates.test(digit - 1)) {
           ++count;
           matchCol = col;
@@ -1534,9 +1532,8 @@ int ApplyHiddenSingles(Grid& grid) {
         if (grid[row][col].value != 0) {
           continue;
         }
-        // Use user's pencil marks if available, otherwise compute legal candidates
-        const std::bitset<9> candidates =
-            grid[row][col].pencil.any() ? grid[row][col].pencil : ComputeCandidates(grid, row, col);
+        // Always use legal candidates. Pencil marks may be stale/incomplete.
+        const std::bitset<9> candidates = ComputeCandidates(grid, row, col);
         if (candidates.test(digit - 1)) {
           ++count;
           matchRow = row;

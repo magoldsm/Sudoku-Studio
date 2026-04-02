@@ -5,7 +5,15 @@
       "Bash(./build/sudoku_ui --hint-stress-test 5)",
       "Bash(timeout 10 ./build/sudoku_ui --hint-stress-test 3)",
       "Bash(timeout 8 ./build/sudoku_ui --hint-stress-test 3)",
-      "Bash(timeout 10 ./build/sudoku_ui --hint-stress-test 10)"
+      "Bash(timeout 10 ./build/sudoku_ui --hint-stress-test 10)",
+      "Bash(timeout 10 ./build/sudoku_ui)",
+      "Bash(timeout 15 ./build/sudoku_ui --hint-stress-test 2)",
+      "Bash(timeout 5 ./build/sudoku_ui --hint-stress-test 1)",
+      "Bash(timeout 15 ./build/sudoku_ui --hint-stress-test 3)",
+      "Bash(timeout 10 ./build/sudoku_ui --hint-stress-test 1)",
+      "Bash(timeout 20 ./build/sudoku_ui --hint-stress-test 3)",
+      "Bash(git checkout:*)",
+      "Bash(timeout 15 ./build/sudoku_ui --hint-stress-test 1)"
     ]
   }
 }
