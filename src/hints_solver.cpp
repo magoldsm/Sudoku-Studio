@@ -36,6 +36,22 @@ CandidateGrid BuildCandidateGrid(const Grid& grid) {
   return candidates;
 }
 
+// Like BuildCandidateGrid but always uses full legal candidates, ignoring pencil marks.
+// Used by GenerateHint so incomplete/narrowed pencil marks don't hide available techniques.
+CandidateGrid BuildFullCandidateGrid(const Grid& grid) {
+  CandidateGrid candidates{};
+  for (int row = 0; row < kGridSize; ++row) {
+    for (int col = 0; col < kGridSize; ++col) {
+      if (grid[row][col].value != 0) {
+        candidates[row][col].reset();
+      } else {
+        candidates[row][col] = ComputeCandidates(grid, row, col);
+      }
+    }
+  }
+  return candidates;
+}
+
 std::vector<UnitCells> BuildAllUnits() {
   std::vector<UnitCells> units;
   // 9 rows + 9 columns + 9 boxes.
@@ -240,25 +256,53 @@ Hint DetectPointingPairs(const CandidateGrid& candidates) {
         bool hasElimination = false;
         if (sameRow) {
           const int row = boxCells.front().row;
-          for (int col = 0; col < kGridSize; ++col) {
-            if (col >= startCol && col < startCol + 3) {
-              continue;
+          // Verify digit appears ONLY in this row within the box
+          bool appearsOnlyInThisRow = true;
+          for (int r = startRow; r < startRow + 3; ++r) {
+            if (r == row) continue;
+            for (int c = startCol; c < startCol + 3; ++c) {
+              if (candidates[r][c].test(digit - 1)) {
+                appearsOnlyInThisRow = false;
+                break;
+              }
             }
-            if (candidates[row][col].test(digit - 1)) {
-              AddUniqueCell(affected, row, col);
-              hasElimination = true;
+            if (!appearsOnlyInThisRow) break;
+          }
+          if (appearsOnlyInThisRow) {
+            for (int col = 0; col < kGridSize; ++col) {
+              if (col >= startCol && col < startCol + 3) {
+                continue;
+              }
+              if (candidates[row][col].test(digit - 1)) {
+                AddUniqueCell(affected, row, col);
+                hasElimination = true;
+              }
             }
           }
         }
         if (sameCol) {
           const int col = boxCells.front().col;
-          for (int row = 0; row < kGridSize; ++row) {
-            if (row >= startRow && row < startRow + 3) {
-              continue;
+          // Verify digit appears ONLY in this column within the box
+          bool appearsOnlyInThisCol = true;
+          for (int c = startCol; c < startCol + 3; ++c) {
+            if (c == col) continue;
+            for (int r = startRow; r < startRow + 3; ++r) {
+              if (candidates[r][c].test(digit - 1)) {
+                appearsOnlyInThisCol = false;
+                break;
+              }
             }
-            if (candidates[row][col].test(digit - 1)) {
-              AddUniqueCell(affected, row, col);
-              hasElimination = true;
+            if (!appearsOnlyInThisCol) break;
+          }
+          if (appearsOnlyInThisCol) {
+            for (int row = 0; row < kGridSize; ++row) {
+              if (row >= startRow && row < startRow + 3) {
+                continue;
+              }
+              if (candidates[row][col].test(digit - 1)) {
+                AddUniqueCell(affected, row, col);
+                hasElimination = true;
+              }
             }
           }
         }
@@ -290,6 +334,21 @@ Hint DetectBoxLineReduction(const CandidateGrid& candidates) {
         sameBox = sameBox && (cell.col / 3 == boxCol);
       }
       if (sameBox) {
+        // Verify digit appears ONLY in this row within the box
+        // (not in other rows of the same box)
+        bool appearsOnlyInThisRow = true;
+        for (int r = (row / 3) * 3; r < (row / 3) * 3 + 3; ++r) {
+          if (r == row) continue;
+          for (int c = boxCol * 3; c < boxCol * 3 + 3; ++c) {
+            if (candidates[r][c].test(digit - 1)) {
+              appearsOnlyInThisRow = false;
+              break;
+            }
+          }
+          if (!appearsOnlyInThisRow) break;
+        }
+        if (!appearsOnlyInThisRow) continue;
+
         std::vector<HintCell> affected = rowCells;
         const int startRow = (row / 3) * 3;
         const int startCol = boxCol * 3;
@@ -327,6 +386,21 @@ Hint DetectBoxLineReduction(const CandidateGrid& candidates) {
         sameBox = sameBox && (cell.row / 3 == boxRow);
       }
       if (sameBox) {
+        // Verify digit appears ONLY in this column within the box
+        // (not in other columns of the same box)
+        bool appearsOnlyInThisCol = true;
+        for (int c = (col / 3) * 3; c < (col / 3) * 3 + 3; ++c) {
+          if (c == col) continue;
+          for (int r = boxRow * 3; r < boxRow * 3 + 3; ++r) {
+            if (candidates[r][c].test(digit - 1)) {
+              appearsOnlyInThisCol = false;
+              break;
+            }
+          }
+          if (!appearsOnlyInThisCol) break;
+        }
+        if (!appearsOnlyInThisCol) continue;
+
         std::vector<HintCell> affected = colCells;
         const int startRow = boxRow * 3;
         const int startCol = (col / 3) * 3;
@@ -1257,6 +1331,12 @@ Hint DetectForcingChains(const Grid& grid, const CandidateGrid& candidates) {
         continue;
       }
 
+      // Only suggest Forcing Chains on cells where the user actually has a bivalue situation.
+      // The pivot must have exactly 2 pencil marks (not narrowed down further by the user).
+      if (grid[row][col].pencil.count() != 2) {
+        continue;
+      }
+
       const ForcingBranchResult left = SimulateForcingBranch(grid, row, col, pivotDigits[0]);
       const ForcingBranchResult right = SimulateForcingBranch(grid, row, col, pivotDigits[1]);
 
@@ -1315,97 +1395,6 @@ Hint DetectForcingChains(const Grid& grid, const CandidateGrid& candidates) {
   }
 
   return {};
-}
-
-Hint GenerateHint(const Grid& grid) {
-  const CandidateGrid candidates = BuildCandidateGrid(grid);
-
-  // Ordered from easier/common techniques to heavier analysis.
-  const std::array<Hint (*)(const CandidateGrid&), 10> detectors = {
-      DetectNakedSingles,
-      DetectHiddenSingles,
-      DetectPointingPairs,
-      DetectBoxLineReduction,
-      [](const CandidateGrid& c) { return DetectNakedSubset(c, 2, "Naked Pair"); },
-      [](const CandidateGrid& c) { return DetectHiddenSubset(c, 2, "Hidden Pair"); },
-      [](const CandidateGrid& c) { return DetectNakedSubset(c, 3, "Naked Triple"); },
-      [](const CandidateGrid& c) { return DetectHiddenSubset(c, 3, "Hidden Triple"); },
-      [](const CandidateGrid& c) { return DetectNakedSubset(c, 4, "Naked Quad"); },
-      [](const CandidateGrid& c) { return DetectHiddenSubset(c, 4, "Hidden Quad"); },
-  };
-
-  for (int i = 0; i < static_cast<int>(detectors.size()); ++i) {
-    Hint hint = detectors[i](candidates);
-    if (!hint.IsValid()) continue;
-    // Validate hidden subset hints: they are only actionable if there are
-    // actual pencil marks to eliminate (detector uses CandidateGrid which
-    // includes legal candidates for cells that have no pencil marks set).
-    if (hint.techniqueName == "Hidden Pair") {
-      Grid testGrid = grid;
-      if (ApplyHiddenPairs(testGrid) == 0) continue;
-    } else if (hint.techniqueName == "Hidden Triple") {
-      Grid testGrid = grid;
-      if (ApplyHiddenTriples(testGrid) == 0) continue;
-    } else if (hint.techniqueName == "Hidden Quad") {
-      // No dedicated apply function for quads; validate by checking
-      // that affected cells actually have pencil marks to eliminate.
-      bool actionable = false;
-      for (const auto& hc : hint.affectedCells) {
-        if (grid[hc.row][hc.col].pencil.any()) { actionable = true; break; }
-      }
-      if (!actionable) continue;
-    }
-    return hint;
-  }
-
-  Hint hint = DetectBlockBlockInteraction(candidates);
-  if (hint.IsValid()) {
-    return hint;
-  }
-
-  hint = DetectFish(candidates, 2, "X-Wing");
-  if (hint.IsValid()) {
-    return hint;
-  }
-
-  hint = DetectUniqueRectangleType1(candidates);
-  if (hint.IsValid()) {
-    return hint;
-  }
-
-  hint = DetectXYWing(candidates);
-  if (hint.IsValid()) {
-    return hint;
-  }
-
-  hint = DetectSimpleColoring(candidates);
-  if (hint.IsValid()) {
-    return hint;
-  }
-
-  hint = DetectFish(candidates, 3, "Swordfish");
-  if (hint.IsValid()) {
-    return hint;
-  }
-
-  hint = DetectXYZWing(candidates);
-  if (hint.IsValid()) {
-    return hint;
-  }
-
-  hint = DetectXYChain(candidates);
-  if (hint.IsValid()) {
-    return hint;
-  }
-
-  hint = DetectFish(candidates, 4, "Jellyfish");
-  if (hint.IsValid()) {
-    return hint;
-  }
-
-  Hint emptyHint;
-  emptyHint.techniqueName = "No supported Sadman hint available";
-  return emptyHint;
 }
 
 bool IsInsideGrid(int row, int col) {
@@ -1891,21 +1880,17 @@ int ApplyBoxLineReduction(Grid& grid) {
 int ApplyNakedPairs(Grid& grid) {
   bool madeChanges = false;
 
-  // Find pairs in rows, columns, and boxes
+  // Rows
   for (int r = 0; r < kGridSize; ++r) {
     std::vector<std::pair<long unsigned int, std::pair<int, int>>> pairCells;
-
     for (int c = 0; c < kGridSize; ++c) {
       if (grid[r][c].value == 0 && grid[r][c].pencil.count() == 2) {
         pairCells.push_back({grid[r][c].pencil.to_ulong(), {r, c}});
       }
     }
-
-    // Check for duplicate pairs in row
     for (size_t i = 0; i < pairCells.size(); ++i) {
       for (size_t j = i + 1; j < pairCells.size(); ++j) {
         if (pairCells[i].first == pairCells[j].first) {
-          // Found a pair, remove these candidates from other cells in row
           const auto& pair = pairCells[i].first;
           for (int c = 0; c < kGridSize; ++c) {
             if (c != pairCells[i].second.second && c != pairCells[j].second.second) {
@@ -1922,7 +1907,68 @@ int ApplyNakedPairs(Grid& grid) {
     }
   }
 
-  // Return 1 if technique was applied, 0 otherwise
+  // Columns
+  for (int c = 0; c < kGridSize; ++c) {
+    std::vector<std::pair<long unsigned int, std::pair<int, int>>> pairCells;
+    for (int r = 0; r < kGridSize; ++r) {
+      if (grid[r][c].value == 0 && grid[r][c].pencil.count() == 2) {
+        pairCells.push_back({grid[r][c].pencil.to_ulong(), {r, c}});
+      }
+    }
+    for (size_t i = 0; i < pairCells.size(); ++i) {
+      for (size_t j = i + 1; j < pairCells.size(); ++j) {
+        if (pairCells[i].first == pairCells[j].first) {
+          const auto& pair = pairCells[i].first;
+          for (int r = 0; r < kGridSize; ++r) {
+            if (r != pairCells[i].second.first && r != pairCells[j].second.first) {
+              for (int d = 0; d < 9; ++d) {
+                if (((pair >> d) & 1) && grid[r][c].pencil.test(d)) {
+                  grid[r][c].pencil.reset(d);
+                  madeChanges = true;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Boxes
+  for (int boxR = 0; boxR < 3; ++boxR) {
+    for (int boxC = 0; boxC < 3; ++boxC) {
+      std::vector<std::pair<long unsigned int, std::pair<int, int>>> pairCells;
+      for (int r = boxR * 3; r < boxR * 3 + 3; ++r) {
+        for (int c = boxC * 3; c < boxC * 3 + 3; ++c) {
+          if (grid[r][c].value == 0 && grid[r][c].pencil.count() == 2) {
+            pairCells.push_back({grid[r][c].pencil.to_ulong(), {r, c}});
+          }
+        }
+      }
+      for (size_t i = 0; i < pairCells.size(); ++i) {
+        for (size_t j = i + 1; j < pairCells.size(); ++j) {
+          if (pairCells[i].first == pairCells[j].first) {
+            const auto& pair = pairCells[i].first;
+            for (int r = boxR * 3; r < boxR * 3 + 3; ++r) {
+              for (int c = boxC * 3; c < boxC * 3 + 3; ++c) {
+                if (r != pairCells[i].second.first || c != pairCells[i].second.second) {
+                  if (r != pairCells[j].second.first || c != pairCells[j].second.second) {
+                    for (int d = 0; d < 9; ++d) {
+                      if (((pair >> d) & 1) && grid[r][c].pencil.test(d)) {
+                        grid[r][c].pencil.reset(d);
+                        madeChanges = true;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   return madeChanges ? 1 : 0;
 }
 
@@ -2016,6 +2062,49 @@ int ApplyHiddenPairs(Grid& grid) {
     }
   }
 
+  // Boxes
+  for (int boxR = 0; boxR < 3; ++boxR) {
+    for (int boxC = 0; boxC < 3; ++boxC) {
+      for (int d1 = 1; d1 <= 9; ++d1) {
+        for (int d2 = d1 + 1; d2 <= 9; ++d2) {
+          std::vector<std::pair<int, int>> cellsWithPair;
+          for (int r = boxR * 3; r < boxR * 3 + 3; ++r) {
+            for (int c = boxC * 3; c < boxC * 3 + 3; ++c) {
+              if (grid[r][c].value == 0 && grid[r][c].pencil.test(d1 - 1) &&
+                  grid[r][c].pencil.test(d2 - 1)) {
+                cellsWithPair.push_back({r, c});
+              }
+            }
+          }
+
+          if (cellsWithPair.size() == 2) {
+            bool d1OnlyInPair = true;
+            bool d2OnlyInPair = true;
+            for (int r = boxR * 3; r < boxR * 3 + 3; ++r) {
+              for (int c = boxC * 3; c < boxC * 3 + 3; ++c) {
+                if (r == cellsWithPair[0].first && c == cellsWithPair[0].second) continue;
+                if (r == cellsWithPair[1].first && c == cellsWithPair[1].second) continue;
+                if (grid[r][c].value == 0 && grid[r][c].pencil.test(d1 - 1)) d1OnlyInPair = false;
+                if (grid[r][c].value == 0 && grid[r][c].pencil.test(d2 - 1)) d2OnlyInPair = false;
+              }
+            }
+
+            if (d1OnlyInPair && d2OnlyInPair) {
+              for (const auto& [r, c] : cellsWithPair) {
+                for (int d = 1; d <= 9; ++d) {
+                  if (d != d1 && d != d2 && grid[r][c].pencil.test(d - 1)) {
+                    grid[r][c].pencil.reset(d - 1);
+                    madeChanges = true;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   return madeChanges ? 1 : 0;
 }
 
@@ -2086,6 +2175,48 @@ int ApplyNakedTriples(Grid& grid) {
                   if (unionCandidates.test(d) && grid[r][c].pencil.test(d)) {
                     grid[r][c].pencil.reset(d);
                     madeChanges = true;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Boxes
+  for (int boxR = 0; boxR < 3; ++boxR) {
+    for (int boxC = 0; boxC < 3; ++boxC) {
+      std::vector<std::pair<int, int>> tripleCells;
+      for (int r = boxR * 3; r < boxR * 3 + 3; ++r) {
+        for (int c = boxC * 3; c < boxC * 3 + 3; ++c) {
+          if (grid[r][c].value == 0 && grid[r][c].pencil.count() >= 2 &&
+              grid[r][c].pencil.count() <= 3) {
+            tripleCells.push_back({r, c});
+          }
+        }
+      }
+
+      for (size_t i = 0; i < tripleCells.size(); ++i) {
+        for (size_t j = i + 1; j < tripleCells.size(); ++j) {
+          for (size_t k = j + 1; k < tripleCells.size(); ++k) {
+            const std::bitset<9> unionCandidates =
+                grid[tripleCells[i].first][tripleCells[i].second].pencil |
+                grid[tripleCells[j].first][tripleCells[j].second].pencil |
+                grid[tripleCells[k].first][tripleCells[k].second].pencil;
+
+            if (unionCandidates.count() == 3) {
+              for (int r = boxR * 3; r < boxR * 3 + 3; ++r) {
+                for (int c = boxC * 3; c < boxC * 3 + 3; ++c) {
+                  if (r == tripleCells[i].first && c == tripleCells[i].second) continue;
+                  if (r == tripleCells[j].first && c == tripleCells[j].second) continue;
+                  if (r == tripleCells[k].first && c == tripleCells[k].second) continue;
+                  for (int d = 0; d < 9; ++d) {
+                    if (unionCandidates.test(d) && grid[r][c].pencil.test(d)) {
+                      grid[r][c].pencil.reset(d);
+                      madeChanges = true;
+                    }
                   }
                 }
               }
@@ -2193,7 +2324,545 @@ int ApplyHiddenTriples(Grid& grid) {
     }
   }
 
+  // Boxes
+  for (int boxR = 0; boxR < 3; ++boxR) {
+    for (int boxC = 0; boxC < 3; ++boxC) {
+      for (int d1 = 1; d1 <= 9; ++d1) {
+        for (int d2 = d1 + 1; d2 <= 9; ++d2) {
+          for (int d3 = d2 + 1; d3 <= 9; ++d3) {
+            std::vector<std::pair<int, int>> cellsWithTriple;
+            for (int r = boxR * 3; r < boxR * 3 + 3; ++r) {
+              for (int c = boxC * 3; c < boxC * 3 + 3; ++c) {
+                if (grid[r][c].value == 0 && grid[r][c].pencil.test(d1 - 1) &&
+                    grid[r][c].pencil.test(d2 - 1) && grid[r][c].pencil.test(d3 - 1)) {
+                  cellsWithTriple.push_back({r, c});
+                }
+              }
+            }
+
+            if (cellsWithTriple.size() == 3) {
+              bool allOnlyInTriple = true;
+              for (int r = boxR * 3; r < boxR * 3 + 3 && allOnlyInTriple; ++r) {
+                for (int c = boxC * 3; c < boxC * 3 + 3 && allOnlyInTriple; ++c) {
+                  if (r == cellsWithTriple[0].first && c == cellsWithTriple[0].second) continue;
+                  if (r == cellsWithTriple[1].first && c == cellsWithTriple[1].second) continue;
+                  if (r == cellsWithTriple[2].first && c == cellsWithTriple[2].second) continue;
+                  if (grid[r][c].value == 0 &&
+                      (grid[r][c].pencil.test(d1 - 1) || grid[r][c].pencil.test(d2 - 1) ||
+                       grid[r][c].pencil.test(d3 - 1))) {
+                    allOnlyInTriple = false;
+                  }
+                }
+              }
+
+              if (allOnlyInTriple) {
+                for (const auto& [r, c] : cellsWithTriple) {
+                  for (int d = 1; d <= 9; ++d) {
+                    if (d != d1 && d != d2 && d != d3 && grid[r][c].pencil.test(d - 1)) {
+                      grid[r][c].pencil.reset(d - 1);
+                      madeChanges = true;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   return madeChanges ? 1 : 0;
+}
+
+int ApplyNakedQuads(Grid& grid) {
+  bool madeChanges = false;
+
+  // Rows
+  for (int r = 0; r < kGridSize; ++r) {
+    std::vector<int> qc;
+    for (int c = 0; c < kGridSize; ++c)
+      if (grid[r][c].value == 0 && grid[r][c].pencil.count() >= 2 && grid[r][c].pencil.count() <= 4)
+        qc.push_back(c);
+    for (size_t i = 0; i < qc.size(); ++i)
+      for (size_t j = i+1; j < qc.size(); ++j)
+        for (size_t k = j+1; k < qc.size(); ++k)
+          for (size_t l = k+1; l < qc.size(); ++l) {
+            const std::bitset<9> un = grid[r][qc[i]].pencil | grid[r][qc[j]].pencil |
+                                      grid[r][qc[k]].pencil | grid[r][qc[l]].pencil;
+            if (un.count() != 4) continue;
+            for (int c = 0; c < kGridSize; ++c) {
+              if (c == qc[i] || c == qc[j] || c == qc[k] || c == qc[l]) continue;
+              for (int d = 0; d < 9; ++d)
+                if (un.test(d) && grid[r][c].pencil.test(d)) { grid[r][c].pencil.reset(d); madeChanges = true; }
+            }
+          }
+  }
+
+  // Columns
+  for (int c = 0; c < kGridSize; ++c) {
+    std::vector<int> qc;
+    for (int r = 0; r < kGridSize; ++r)
+      if (grid[r][c].value == 0 && grid[r][c].pencil.count() >= 2 && grid[r][c].pencil.count() <= 4)
+        qc.push_back(r);
+    for (size_t i = 0; i < qc.size(); ++i)
+      for (size_t j = i+1; j < qc.size(); ++j)
+        for (size_t k = j+1; k < qc.size(); ++k)
+          for (size_t l = k+1; l < qc.size(); ++l) {
+            const std::bitset<9> un = grid[qc[i]][c].pencil | grid[qc[j]][c].pencil |
+                                      grid[qc[k]][c].pencil | grid[qc[l]][c].pencil;
+            if (un.count() != 4) continue;
+            for (int r = 0; r < kGridSize; ++r) {
+              if (r == qc[i] || r == qc[j] || r == qc[k] || r == qc[l]) continue;
+              for (int d = 0; d < 9; ++d)
+                if (un.test(d) && grid[r][c].pencil.test(d)) { grid[r][c].pencil.reset(d); madeChanges = true; }
+            }
+          }
+  }
+
+  // Boxes
+  for (int boxR = 0; boxR < 3; ++boxR) {
+    for (int boxC = 0; boxC < 3; ++boxC) {
+      std::vector<std::pair<int,int>> qc;
+      for (int r = boxR*3; r < boxR*3+3; ++r)
+        for (int c = boxC*3; c < boxC*3+3; ++c)
+          if (grid[r][c].value == 0 && grid[r][c].pencil.count() >= 2 && grid[r][c].pencil.count() <= 4)
+            qc.push_back({r, c});
+      for (size_t i = 0; i < qc.size(); ++i)
+        for (size_t j = i+1; j < qc.size(); ++j)
+          for (size_t k = j+1; k < qc.size(); ++k)
+            for (size_t l = k+1; l < qc.size(); ++l) {
+              const std::bitset<9> un = grid[qc[i].first][qc[i].second].pencil |
+                                        grid[qc[j].first][qc[j].second].pencil |
+                                        grid[qc[k].first][qc[k].second].pencil |
+                                        grid[qc[l].first][qc[l].second].pencil;
+              if (un.count() != 4) continue;
+              for (int r = boxR*3; r < boxR*3+3; ++r) {
+                for (int c = boxC*3; c < boxC*3+3; ++c) {
+                  if ((r==qc[i].first&&c==qc[i].second)||(r==qc[j].first&&c==qc[j].second)||
+                      (r==qc[k].first&&c==qc[k].second)||(r==qc[l].first&&c==qc[l].second)) continue;
+                  for (int d = 0; d < 9; ++d)
+                    if (un.test(d) && grid[r][c].pencil.test(d)) { grid[r][c].pencil.reset(d); madeChanges = true; }
+                }
+              }
+            }
+    }
+  }
+
+  return madeChanges ? 1 : 0;
+}
+
+int ApplyHiddenQuads(Grid& grid) {
+  bool madeChanges = false;
+
+  // Rows
+  for (int r = 0; r < kGridSize; ++r) {
+    for (int d1 = 1; d1 <= 9; ++d1)
+      for (int d2 = d1+1; d2 <= 9; ++d2)
+        for (int d3 = d2+1; d3 <= 9; ++d3)
+          for (int d4 = d3+1; d4 <= 9; ++d4) {
+            std::vector<int> qc;
+            for (int c = 0; c < kGridSize; ++c)
+              if (grid[r][c].value == 0 && grid[r][c].pencil.test(d1-1) && grid[r][c].pencil.test(d2-1) &&
+                  grid[r][c].pencil.test(d3-1) && grid[r][c].pencil.test(d4-1))
+                qc.push_back(c);
+            if (qc.size() != 4) continue;
+            bool only = true;
+            for (int c = 0; c < kGridSize && only; ++c) {
+              if (std::find(qc.begin(), qc.end(), c) != qc.end()) continue;
+              if (grid[r][c].value == 0 && (grid[r][c].pencil.test(d1-1) || grid[r][c].pencil.test(d2-1) ||
+                  grid[r][c].pencil.test(d3-1) || grid[r][c].pencil.test(d4-1))) only = false;
+            }
+            if (!only) continue;
+            for (int c : qc)
+              for (int d = 1; d <= 9; ++d)
+                if (d != d1 && d != d2 && d != d3 && d != d4 && grid[r][c].pencil.test(d-1)) {
+                  grid[r][c].pencil.reset(d-1); madeChanges = true;
+                }
+          }
+  }
+
+  // Columns
+  for (int c = 0; c < kGridSize; ++c) {
+    for (int d1 = 1; d1 <= 9; ++d1)
+      for (int d2 = d1+1; d2 <= 9; ++d2)
+        for (int d3 = d2+1; d3 <= 9; ++d3)
+          for (int d4 = d3+1; d4 <= 9; ++d4) {
+            std::vector<int> qc;
+            for (int r = 0; r < kGridSize; ++r)
+              if (grid[r][c].value == 0 && grid[r][c].pencil.test(d1-1) && grid[r][c].pencil.test(d2-1) &&
+                  grid[r][c].pencil.test(d3-1) && grid[r][c].pencil.test(d4-1))
+                qc.push_back(r);
+            if (qc.size() != 4) continue;
+            bool only = true;
+            for (int r = 0; r < kGridSize && only; ++r) {
+              if (std::find(qc.begin(), qc.end(), r) != qc.end()) continue;
+              if (grid[r][c].value == 0 && (grid[r][c].pencil.test(d1-1) || grid[r][c].pencil.test(d2-1) ||
+                  grid[r][c].pencil.test(d3-1) || grid[r][c].pencil.test(d4-1))) only = false;
+            }
+            if (!only) continue;
+            for (int r : qc)
+              for (int d = 1; d <= 9; ++d)
+                if (d != d1 && d != d2 && d != d3 && d != d4 && grid[r][c].pencil.test(d-1)) {
+                  grid[r][c].pencil.reset(d-1); madeChanges = true;
+                }
+          }
+  }
+
+  // Boxes
+  for (int boxR = 0; boxR < 3; ++boxR) {
+    for (int boxC = 0; boxC < 3; ++boxC) {
+      for (int d1 = 1; d1 <= 9; ++d1)
+        for (int d2 = d1+1; d2 <= 9; ++d2)
+          for (int d3 = d2+1; d3 <= 9; ++d3)
+            for (int d4 = d3+1; d4 <= 9; ++d4) {
+              std::vector<std::pair<int,int>> qc;
+              for (int r = boxR*3; r < boxR*3+3; ++r)
+                for (int c = boxC*3; c < boxC*3+3; ++c)
+                  if (grid[r][c].value == 0 && grid[r][c].pencil.test(d1-1) && grid[r][c].pencil.test(d2-1) &&
+                      grid[r][c].pencil.test(d3-1) && grid[r][c].pencil.test(d4-1))
+                    qc.push_back({r, c});
+              if (qc.size() != 4) continue;
+              bool only = true;
+              for (int r = boxR*3; r < boxR*3+3 && only; ++r) {
+                for (int c = boxC*3; c < boxC*3+3 && only; ++c) {
+                  if (ContainsCell({{qc[0].first,qc[0].second},{qc[1].first,qc[1].second},
+                                    {qc[2].first,qc[2].second},{qc[3].first,qc[3].second}}, r, c)) continue;
+                  if (grid[r][c].value == 0 && (grid[r][c].pencil.test(d1-1) || grid[r][c].pencil.test(d2-1) ||
+                      grid[r][c].pencil.test(d3-1) || grid[r][c].pencil.test(d4-1))) only = false;
+                }
+              }
+              if (!only) continue;
+              for (const auto& [r, c] : qc)
+                for (int d = 1; d <= 9; ++d)
+                  if (d != d1 && d != d2 && d != d3 && d != d4 && grid[r][c].pencil.test(d-1)) {
+                    grid[r][c].pencil.reset(d-1); madeChanges = true;
+                  }
+            }
+    }
+  }
+
+  return madeChanges ? 1 : 0;
+}
+
+int ApplyBlockBlockInteraction(Grid& grid) {
+  bool madeChanges = false;
+
+  // Band interactions: digit confined to same rows in two boxes → eliminate from third box
+  for (int band = 0; band < 3; ++band) {
+    const int startRow = band * 3;
+    for (int digit = 1; digit <= 9; ++digit) {
+      std::array<std::bitset<3>, 3> rowMasks{};
+      for (int boxCol = 0; boxCol < 3; ++boxCol) {
+        const int startCol = boxCol * 3;
+        for (int r = 0; r < 3; ++r)
+          for (int c = 0; c < 3; ++c)
+            if (grid[startRow+r][startCol+c].pencil.test(digit-1)) rowMasks[boxCol].set(r);
+      }
+      for (int boxA = 0; boxA < 2; ++boxA) {
+        for (int boxB = boxA+1; boxB < 3; ++boxB) {
+          const std::bitset<3> shared = rowMasks[boxA] & rowMasks[boxB];
+          if (shared.count() != 2 || rowMasks[boxA] != shared || rowMasks[boxB] != shared) continue;
+          const int boxC = 3 - boxA - boxB;
+          const int startColC = boxC * 3;
+          for (int rr = 0; rr < 3; ++rr) {
+            if (!shared.test(rr)) continue;
+            const int row = startRow + rr;
+            for (int cc = 0; cc < 3; ++cc)
+              if (grid[row][startColC+cc].pencil.test(digit-1)) {
+                grid[row][startColC+cc].pencil.reset(digit-1); madeChanges = true;
+              }
+          }
+        }
+      }
+    }
+  }
+
+  // Stack interactions: digit confined to same cols in two boxes → eliminate from third box
+  for (int stack = 0; stack < 3; ++stack) {
+    const int startCol = stack * 3;
+    for (int digit = 1; digit <= 9; ++digit) {
+      std::array<std::bitset<3>, 3> colMasks{};
+      for (int boxRow = 0; boxRow < 3; ++boxRow) {
+        const int sRow = boxRow * 3;
+        for (int r = 0; r < 3; ++r)
+          for (int c = 0; c < 3; ++c)
+            if (grid[sRow+r][startCol+c].pencil.test(digit-1)) colMasks[boxRow].set(c);
+      }
+      for (int boxA = 0; boxA < 2; ++boxA) {
+        for (int boxB = boxA+1; boxB < 3; ++boxB) {
+          const std::bitset<3> shared = colMasks[boxA] & colMasks[boxB];
+          if (shared.count() != 2 || colMasks[boxA] != shared || colMasks[boxB] != shared) continue;
+          const int boxC = 3 - boxA - boxB;
+          const int startRowC = boxC * 3;
+          for (int cc = 0; cc < 3; ++cc) {
+            if (!shared.test(cc)) continue;
+            const int col = startCol + cc;
+            for (int rr = 0; rr < 3; ++rr)
+              if (grid[startRowC+rr][col].pencil.test(digit-1)) {
+                grid[startRowC+rr][col].pencil.reset(digit-1); madeChanges = true;
+              }
+          }
+        }
+      }
+    }
+  }
+
+  return madeChanges ? 1 : 0;
+}
+
+// Generic fish (X-Wing = size 2, Swordfish = 3, Jellyfish = 4).
+static int ApplyFishImpl(Grid& grid, int size) {
+  bool madeChanges = false;
+  for (int digit = 1; digit <= 9; ++digit) {
+    // Row-based
+    std::vector<int> baseRows;
+    for (int row = 0; row < kGridSize; ++row) {
+      int count = 0;
+      for (int col = 0; col < kGridSize; ++col)
+        if (grid[row][col].value == 0 && grid[row][col].pencil.test(digit-1)) ++count;
+      if (count >= 2 && count <= size) baseRows.push_back(row);
+    }
+    std::vector<int> choice;
+    ForEachCombination(baseRows, size, 0, choice, [&](const std::vector<int>& rows) -> bool {
+      std::bitset<9> colsMask;
+      for (int row : rows)
+        for (int col = 0; col < kGridSize; ++col)
+          if (grid[row][col].value == 0 && grid[row][col].pencil.test(digit-1)) colsMask.set(col);
+      if (static_cast<int>(colsMask.count()) != size) return false;
+      for (int row = 0; row < kGridSize; ++row) {
+        if (std::find(rows.begin(), rows.end(), row) != rows.end()) continue;
+        for (int col = 0; col < kGridSize; ++col)
+          if (colsMask.test(col) && grid[row][col].value == 0 && grid[row][col].pencil.test(digit-1)) {
+            grid[row][col].pencil.reset(digit-1); madeChanges = true;
+          }
+      }
+      return false;
+    });
+
+    // Col-based
+    std::vector<int> baseCols;
+    for (int col = 0; col < kGridSize; ++col) {
+      int count = 0;
+      for (int row = 0; row < kGridSize; ++row)
+        if (grid[row][col].value == 0 && grid[row][col].pencil.test(digit-1)) ++count;
+      if (count >= 2 && count <= size) baseCols.push_back(col);
+    }
+    choice.clear();
+    ForEachCombination(baseCols, size, 0, choice, [&](const std::vector<int>& cols) -> bool {
+      std::bitset<9> rowsMask;
+      for (int col : cols)
+        for (int row = 0; row < kGridSize; ++row)
+          if (grid[row][col].value == 0 && grid[row][col].pencil.test(digit-1)) rowsMask.set(row);
+      if (static_cast<int>(rowsMask.count()) != size) return false;
+      for (int col = 0; col < kGridSize; ++col) {
+        if (std::find(cols.begin(), cols.end(), col) != cols.end()) continue;
+        for (int row = 0; row < kGridSize; ++row)
+          if (rowsMask.test(row) && grid[row][col].value == 0 && grid[row][col].pencil.test(digit-1)) {
+            grid[row][col].pencil.reset(digit-1); madeChanges = true;
+          }
+      }
+      return false;
+    });
+  }
+  return madeChanges ? 1 : 0;
+}
+
+int ApplyXWing(Grid& grid)    { return ApplyFishImpl(grid, 2); }
+int ApplySwordfish(Grid& grid) { return ApplyFishImpl(grid, 3); }
+int ApplyJellyfish(Grid& grid) { return ApplyFishImpl(grid, 4); }
+
+int ApplyUniqueRectangle(Grid& grid) {
+  const CandidateGrid candidates = BuildCandidateGrid(grid);
+  const Hint hint = DetectUniqueRectangleType1(candidates);
+  if (!hint.IsValid() || hint.affectedCells.size() < 5 || hint.involvedDigits.empty()) return 0;
+  // affectedCells = {a, b, c, d, extraCell}; the 5th entry is the cell with extra candidates.
+  const HintCell extraCell = hint.affectedCells[4];
+  int changes = 0;
+  for (int digit : hint.involvedDigits)
+    if (grid[extraCell.row][extraCell.col].value == 0 && grid[extraCell.row][extraCell.col].pencil.test(digit-1)) {
+      grid[extraCell.row][extraCell.col].pencil.reset(digit-1); ++changes;
+    }
+  return changes > 0 ? 1 : 0;
+}
+
+int ApplyYWing(Grid& grid) {
+  const CandidateGrid candidates = BuildCandidateGrid(grid);
+  const Hint hint = DetectXYWing(candidates);
+  if (!hint.IsValid() || hint.affectedCells.size() < 3) return 0;
+  // affectedCells = {pivot, wingA, wingB, ...targets}; z-digit = wingA ∩ wingB.
+  const HintCell wingA = hint.affectedCells[1];
+  const HintCell wingB = hint.affectedCells[2];
+  const std::bitset<9> zMask = candidates[wingA.row][wingA.col] & candidates[wingB.row][wingB.col];
+  int changes = 0;
+  for (size_t i = 3; i < hint.affectedCells.size(); ++i) {
+    const HintCell& cell = hint.affectedCells[i];
+    for (int d = 0; d < 9; ++d)
+      if (zMask.test(d) && grid[cell.row][cell.col].value == 0 && grid[cell.row][cell.col].pencil.test(d)) {
+        grid[cell.row][cell.col].pencil.reset(d); ++changes;
+      }
+  }
+  return changes > 0 ? 1 : 0;
+}
+
+int ApplyXYZWing(Grid& grid) {
+  const CandidateGrid candidates = BuildCandidateGrid(grid);
+  const Hint hint = DetectXYZWing(candidates);
+  if (!hint.IsValid() || hint.affectedCells.size() < 3) return 0;
+  // affectedCells = {pivot, wingA, wingB, ...targets}; z-digit = wingA ∩ wingB.
+  const HintCell wingA = hint.affectedCells[1];
+  const HintCell wingB = hint.affectedCells[2];
+  const std::bitset<9> zMask = candidates[wingA.row][wingA.col] & candidates[wingB.row][wingB.col];
+  int changes = 0;
+  for (size_t i = 3; i < hint.affectedCells.size(); ++i) {
+    const HintCell& cell = hint.affectedCells[i];
+    for (int d = 0; d < 9; ++d)
+      if (zMask.test(d) && grid[cell.row][cell.col].value == 0 && grid[cell.row][cell.col].pencil.test(d)) {
+        grid[cell.row][cell.col].pencil.reset(d); ++changes;
+      }
+  }
+  return changes > 0 ? 1 : 0;
+}
+
+int ApplySimpleColoring(Grid& grid) {
+  const CandidateGrid candidates = BuildCandidateGrid(grid);
+  const Hint hint = DetectSimpleColoring(candidates);
+  if (!hint.IsValid() || hint.affectedCells.empty() || hint.involvedDigits.empty()) return 0;
+  // The target cell (sees both color groups) is appended last in affectedCells.
+  const HintCell target = hint.affectedCells.back();
+  const int digit = hint.involvedDigits[0];
+  if (grid[target.row][target.col].value == 0 && grid[target.row][target.col].pencil.test(digit-1)) {
+    grid[target.row][target.col].pencil.reset(digit-1);
+    return 1;
+  }
+  return 0;
+}
+
+int ApplyXYChain(Grid& grid) {
+  const CandidateGrid candidates = BuildCandidateGrid(grid);
+  const Hint hint = DetectXYChain(candidates);
+  if (!hint.IsValid()) return 0;
+  // chainCells are the source links; non-chain cells in affectedCells are elimination targets.
+  int changes = 0;
+  for (const HintCell& cell : hint.affectedCells) {
+    if (ContainsCell(hint.chainCells, cell.row, cell.col)) continue;
+    for (int digit : hint.involvedDigits)
+      if (grid[cell.row][cell.col].value == 0 && grid[cell.row][cell.col].pencil.test(digit-1)) {
+        grid[cell.row][cell.col].pencil.reset(digit-1); ++changes;
+      }
+  }
+  return changes > 0 ? 1 : 0;
+}
+
+int ApplyForcingChains(Grid& grid) {
+  const CandidateGrid candidates = BuildCandidateGrid(grid);
+  const Hint hint = DetectForcingChains(grid, candidates);
+  if (!hint.IsValid() || hint.affectedCells.size() < 2 || hint.involvedDigits.empty()) return 0;
+
+  const HintCell pivot  = hint.affectedCells[0];
+  const HintCell target = hint.affectedCells[1];
+  const int digit = hint.involvedDigits[0];
+  if (grid[target.row][target.col].value != 0) return 0;
+
+  std::vector<int> pivotDigits;
+  for (int d = 0; d < 9; ++d)
+    if (candidates[pivot.row][pivot.col].test(d)) pivotDigits.push_back(d+1);
+  if (pivotDigits.size() != 2) return 0;
+
+  const ForcingBranchResult left  = SimulateForcingBranch(grid, pivot.row, pivot.col, pivotDigits[0]);
+  const ForcingBranchResult right = SimulateForcingBranch(grid, pivot.row, pivot.col, pivotDigits[1]);
+
+  // Common placement: both branches force the same value at target.
+  if (!left.contradiction && !right.contradiction &&
+      left.grid[target.row][target.col].value == digit &&
+      right.grid[target.row][target.col].value == digit) {
+    grid[target.row][target.col].value = digit;
+    grid[target.row][target.col].pencil.reset();
+    RemoveDigitFromPeerPencils(grid, target.row, target.col, digit);
+    return 1;
+  }
+
+  // Common elimination: both branches eliminate digit from target.
+  if (!left.candidates[target.row][target.col].test(digit-1) &&
+      !right.candidates[target.row][target.col].test(digit-1) &&
+      grid[target.row][target.col].pencil.test(digit-1)) {
+    grid[target.row][target.col].pencil.reset(digit-1);
+    return 1;
+  }
+
+  return 0;
+}
+
+int ApplyHint(Grid& grid, const Hint& hint) {
+  const std::string& name = hint.techniqueName;
+  if (name == "Naked Single")                return ApplyNakedSingles(grid);
+  if (name == "Hidden Single")               return ApplyHiddenSingles(grid);
+  if (name == "Pointing Pair/Triple")        return ApplyPointingPairs(grid);
+  if (name == "Box/Line Reduction")          return ApplyBoxLineReduction(grid);
+  if (name == "Naked Pair")                  return ApplyNakedPairs(grid);
+  if (name == "Hidden Pair")                 return ApplyHiddenPairs(grid);
+  if (name == "Naked Triple")                return ApplyNakedTriples(grid);
+  if (name == "Hidden Triple")               return ApplyHiddenTriples(grid);
+  if (name == "Naked Quad")                  return ApplyNakedQuads(grid);
+  if (name == "Hidden Quad")                 return ApplyHiddenQuads(grid);
+  if (name == "Block/Block Interaction")     return ApplyBlockBlockInteraction(grid);
+  if (name == "X-Wing")                      return ApplyXWing(grid);
+  if (name == "Unique Rectangle")            return ApplyUniqueRectangle(grid);
+  if (name == "Y-Wing")                      return ApplyYWing(grid);
+  if (name == "Simple Colouring")            return ApplySimpleColoring(grid);
+  if (name == "Swordfish")                   return ApplySwordfish(grid);
+  if (name == "XYZ-Wing")                    return ApplyXYZWing(grid);
+  if (name == "XY-Chain")                    return ApplyXYChain(grid);
+  if (name == "Jellyfish")                   return ApplyJellyfish(grid);
+  if (name == "Forcing Chains")              return ApplyForcingChains(grid);
+  return 0;
+}
+
+Hint GenerateHint(const Grid& grid) {
+  const CandidateGrid candidates = BuildFullCandidateGrid(grid);
+
+  // Helper: returns the hint only if it would actually change the pencil state.
+  // Detectors use full legal candidates; pencil marks may have already captured
+  // the same eliminations, so we test-apply before committing.
+  auto ActionableHint = [&](Hint h) -> Hint {
+    if (!h.IsValid()) return {};
+    Grid testGrid = grid;
+    if (ApplyHint(testGrid, h) == 0) return {};
+    return h;
+  };
+
+  // Ordered from easier/common techniques to heavier analysis.
+  const std::array<Hint (*)(const CandidateGrid&), 10> detectors = {
+      DetectNakedSingles,
+      DetectHiddenSingles,
+      DetectPointingPairs,
+      DetectBoxLineReduction,
+      [](const CandidateGrid& c) { return DetectNakedSubset(c, 2, "Naked Pair"); },
+      [](const CandidateGrid& c) { return DetectHiddenSubset(c, 2, "Hidden Pair"); },
+      [](const CandidateGrid& c) { return DetectNakedSubset(c, 3, "Naked Triple"); },
+      [](const CandidateGrid& c) { return DetectHiddenSubset(c, 3, "Hidden Triple"); },
+      [](const CandidateGrid& c) { return DetectNakedSubset(c, 4, "Naked Quad"); },
+      [](const CandidateGrid& c) { return DetectHiddenSubset(c, 4, "Hidden Quad"); },
+  };
+
+  for (const auto& detect : detectors) {
+    if (Hint h = ActionableHint(detect(candidates)); h.IsValid()) return h;
+  }
+
+  if (Hint h = ActionableHint(DetectBlockBlockInteraction(candidates)); h.IsValid()) return h;
+  if (Hint h = ActionableHint(DetectFish(candidates, 2, "X-Wing")); h.IsValid()) return h;
+  if (Hint h = ActionableHint(DetectUniqueRectangleType1(candidates)); h.IsValid()) return h;
+  if (Hint h = ActionableHint(DetectXYWing(candidates)); h.IsValid()) return h;
+  if (Hint h = ActionableHint(DetectSimpleColoring(candidates)); h.IsValid()) return h;
+  if (Hint h = ActionableHint(DetectFish(candidates, 3, "Swordfish")); h.IsValid()) return h;
+  if (Hint h = ActionableHint(DetectXYZWing(candidates)); h.IsValid()) return h;
+  if (Hint h = ActionableHint(DetectXYChain(candidates)); h.IsValid()) return h;
+  if (Hint h = ActionableHint(DetectFish(candidates, 4, "Jellyfish")); h.IsValid()) return h;
+  if (Hint h = ActionableHint(DetectForcingChains(grid, candidates)); h.IsValid()) return h;
+
+  Hint emptyHint;
+  emptyHint.techniqueName = "No supported Sadman hint available";
+  return emptyHint;
 }
 
 // Comprehensive solver using all available techniques
@@ -2263,6 +2932,90 @@ bool SolveComprehensive(Puzzle& puzzle) {
       changed = true;
     }
 
+    // Apply naked quads until stable
+    while (true) {
+      const int placed = ApplyNakedQuads(grid);
+      if (placed == 0) break;
+      changed = true;
+    }
+
+    // Apply hidden quads until stable
+    while (true) {
+      const int placed = ApplyHiddenQuads(grid);
+      if (placed == 0) break;
+      changed = true;
+    }
+
+    // Apply block/block interaction until stable
+    while (true) {
+      const int placed = ApplyBlockBlockInteraction(grid);
+      if (placed == 0) break;
+      changed = true;
+    }
+
+    // Apply X-Wing until stable
+    while (true) {
+      const int placed = ApplyXWing(grid);
+      if (placed == 0) break;
+      changed = true;
+    }
+
+    // Apply Unique Rectangle until stable
+    while (true) {
+      const int placed = ApplyUniqueRectangle(grid);
+      if (placed == 0) break;
+      changed = true;
+    }
+
+    // Apply Y-Wing until stable
+    while (true) {
+      const int placed = ApplyYWing(grid);
+      if (placed == 0) break;
+      changed = true;
+    }
+
+    // Apply Simple Colouring until stable
+    while (true) {
+      const int placed = ApplySimpleColoring(grid);
+      if (placed == 0) break;
+      changed = true;
+    }
+
+    // Apply Swordfish until stable
+    while (true) {
+      const int placed = ApplySwordfish(grid);
+      if (placed == 0) break;
+      changed = true;
+    }
+
+    // Apply XYZ-Wing until stable
+    while (true) {
+      const int placed = ApplyXYZWing(grid);
+      if (placed == 0) break;
+      changed = true;
+    }
+
+    // Apply XY-Chain until stable
+    while (true) {
+      const int placed = ApplyXYChain(grid);
+      if (placed == 0) break;
+      changed = true;
+    }
+
+    // Apply Jellyfish until stable
+    while (true) {
+      const int placed = ApplyJellyfish(grid);
+      if (placed == 0) break;
+      changed = true;
+    }
+
+    // Apply Forcing Chains until stable
+    while (true) {
+      const int placed = ApplyForcingChains(grid);
+      if (placed == 0) break;
+      changed = true;
+    }
+
     // If no progress in this iteration, we're done
     if (!changed) {
       break;
@@ -2312,6 +3065,30 @@ int GetTechniqueScore(SolvingTechnique technique) {
       return 30;     // Advanced
     case SolvingTechnique::kHiddenTriple:
       return 40;
+    case SolvingTechnique::kNakedQuad:
+      return 50;
+    case SolvingTechnique::kHiddenQuad:
+      return 60;
+    case SolvingTechnique::kBlockBlockInteraction:
+      return 25;
+    case SolvingTechnique::kXWing:
+      return 80;
+    case SolvingTechnique::kUniqueRectangle:
+      return 70;
+    case SolvingTechnique::kYWing:
+      return 100;
+    case SolvingTechnique::kSimpleColouring:
+      return 120;
+    case SolvingTechnique::kSwordfish:
+      return 140;
+    case SolvingTechnique::kXYZWing:
+      return 150;
+    case SolvingTechnique::kXYChain:
+      return 200;
+    case SolvingTechnique::kJellyfish:
+      return 200;
+    case SolvingTechnique::kForcingChains:
+      return 300;
   }
   return 0;
 }
@@ -2373,13 +3150,89 @@ PuzzleScore SolveAndScoreDetailed(const Puzzle& puzzle) {
       ApplyHiddenSingles(grid);
       continue;
     }
+    if (ApplyNakedQuads(grid) > 0) {
+      score.nakedQuads += GetTechniqueScore(SolvingTechnique::kNakedQuad);
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      continue;
+    }
+    if (ApplyHiddenQuads(grid) > 0) {
+      score.hiddenQuads += GetTechniqueScore(SolvingTechnique::kHiddenQuad);
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      continue;
+    }
+    if (ApplyBlockBlockInteraction(grid) > 0) {
+      score.blockBlockInteractions += GetTechniqueScore(SolvingTechnique::kBlockBlockInteraction);
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      continue;
+    }
+    if (ApplyXWing(grid) > 0) {
+      score.xWings += GetTechniqueScore(SolvingTechnique::kXWing);
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      continue;
+    }
+    if (ApplyUniqueRectangle(grid) > 0) {
+      score.uniqueRectangles += GetTechniqueScore(SolvingTechnique::kUniqueRectangle);
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      continue;
+    }
+    if (ApplyYWing(grid) > 0) {
+      score.yWings += GetTechniqueScore(SolvingTechnique::kYWing);
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      continue;
+    }
+    if (ApplySimpleColoring(grid) > 0) {
+      score.simpleColourings += GetTechniqueScore(SolvingTechnique::kSimpleColouring);
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      continue;
+    }
+    if (ApplySwordfish(grid) > 0) {
+      score.swordfishes += GetTechniqueScore(SolvingTechnique::kSwordfish);
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      continue;
+    }
+    if (ApplyXYZWing(grid) > 0) {
+      score.xyzWings += GetTechniqueScore(SolvingTechnique::kXYZWing);
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      continue;
+    }
+    if (ApplyXYChain(grid) > 0) {
+      score.xyChains += GetTechniqueScore(SolvingTechnique::kXYChain);
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      continue;
+    }
+    if (ApplyJellyfish(grid) > 0) {
+      score.jellyfishes += GetTechniqueScore(SolvingTechnique::kJellyfish);
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      continue;
+    }
+    if (ApplyForcingChains(grid) > 0) {
+      score.forcingChains += GetTechniqueScore(SolvingTechnique::kForcingChains);
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      continue;
+    }
 
     break;  // No technique made progress
   }
 
   score.totalScore = score.nakedSingles + score.hiddenSingles + score.pointingPairs +
                      score.boxLineReductions + score.nakedPairs + score.hiddenPairs +
-                     score.nakedTriples + score.hiddenTriples;
+                     score.nakedTriples + score.hiddenTriples + score.nakedQuads +
+                     score.hiddenQuads + score.blockBlockInteractions + score.xWings +
+                     score.uniqueRectangles + score.yWings + score.simpleColourings +
+                     score.swordfishes + score.xyzWings + score.xyChains +
+                     score.jellyfishes + score.forcingChains;
   return score;
 }
 

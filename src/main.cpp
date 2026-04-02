@@ -370,44 +370,44 @@ Puzzle GeneratePuzzleWithDifficulty(std::mt19937& rng, Difficulty difficulty) {
   // Naked Pair=15, Hidden Pair=20, Naked Triple=30, Hidden Triple=40
   switch (difficulty) {
     case Difficulty::kSimple:
-      targetMinClues = 45;
+      targetMinClues = 17;
       targetScoreMin = 0;
-      targetScoreMax = 5;
+      targetScoreMax = 12;
       break;
     case Difficulty::kEasy:
-      targetMinClues = 40;
-      targetScoreMin = 4;
-      targetScoreMax = 20;
+      targetMinClues = 17;
+      targetScoreMin = 8;
+      targetScoreMax = 30;
       break;
     case Difficulty::kMild:
-      targetMinClues = 35;
-      targetScoreMin = 18;
-      targetScoreMax = 50;
+      targetMinClues = 17;
+      targetScoreMin = 22;
+      targetScoreMax = 80;
       break;
     case Difficulty::kModerate:
-      targetMinClues = 30;
-      targetScoreMin = 48;
-      targetScoreMax = 120;
+      targetMinClues = 17;
+      targetScoreMin = 60;
+      targetScoreMax = 200;
       break;
     case Difficulty::kHard:
-      targetMinClues = 25;
-      targetScoreMin = 110;
-      targetScoreMax = 250;
+      targetMinClues = 17;
+      targetScoreMin = 150;
+      targetScoreMax = 500;
       break;
     case Difficulty::kVeryHard:
-      targetMinClues = 22;
-      targetScoreMin = 240;
-      targetScoreMax = 400;
+      targetMinClues = 17;
+      targetScoreMin = 400;
+      targetScoreMax = 1200;
       break;
     case Difficulty::kFiendish:
-      targetMinClues = 20;
-      targetScoreMin = 390;
-      targetScoreMax = 600;
+      targetMinClues = 17;
+      targetScoreMin = 900;
+      targetScoreMax = 3000;
       break;
     case Difficulty::kDiabolical:
       targetMinClues = 17;
-      targetScoreMin = 590;
-      targetScoreMax = 2000;
+      targetScoreMin = 2000;
+      targetScoreMax = 100000;
       break;
   }
 
@@ -445,7 +445,9 @@ Puzzle GeneratePuzzleWithDifficulty(std::mt19937& rng, Difficulty difficulty) {
       }
       std::shuffle(positions.begin(), positions.end(), threadRng);
 
-      // Remove clues — check uniqueness and allow early exit if another thread succeeded
+      // Remove clues — score-gated so we never overshoot the target difficulty band.
+      // After each successful removal we check the score; if it exceeds targetScoreMax
+      // we put the clue back, preventing minimal-clue puzzles that are too hard.
       for (const auto& [r, c] : positions) {
         if (puzzleFound) return;
 
@@ -454,6 +456,12 @@ Puzzle GeneratePuzzleWithDifficulty(std::mt19937& rng, Difficulty difficulty) {
 
         Puzzle check = current;
         if (CountSolutions(check, 2) != 1) {
+          current[r][c] = value;
+          continue;
+        }
+
+        // Removal keeps uniqueness — reject if it pushes score over the ceiling.
+        if (SolveAndScore(current) > targetScoreMax) {
           current[r][c] = value;
         }
       }
@@ -848,9 +856,237 @@ void DrawBoard(Grid& grid,
 
 using namespace sudoku;
 
+// Solve a puzzle with detailed logging of techniques attempted
+int CountUnsolvedCells(const Grid& grid) {
+  int count = 0;
+  for (int r = 0; r < kGridSize; ++r) {
+    for (int c = 0; c < kGridSize; ++c) {
+      if (grid[r][c].value == 0) count++;
+    }
+  }
+  return count;
+}
+
+std::string SolveWithLogging(Puzzle puzzle) {
+  Grid grid = BuildGrid(puzzle);
+  ApplyAutoPencil(grid);
+
+  std::vector<const char*> appliedTechniques;
+  int iteration = 0;
+  constexpr int kMaxIterations = 200;
+
+  while (iteration < kMaxIterations) {
+    bool changed = false;
+
+    // Try each technique in order
+    if (ApplyNakedSingles(grid) > 0) {
+      appliedTechniques.push_back("Naked Singles");
+      changed = true;
+    } else if (ApplyHiddenSingles(grid) > 0) {
+      appliedTechniques.push_back("Hidden Singles");
+      changed = true;
+    } else if (ApplyPointingPairs(grid) > 0) {
+      appliedTechniques.push_back("Pointing Pairs");
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      changed = true;
+    } else if (ApplyBoxLineReduction(grid) > 0) {
+      appliedTechniques.push_back("Box/Line Reduction");
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      changed = true;
+    } else if (ApplyNakedPairs(grid) > 0) {
+      appliedTechniques.push_back("Naked Pairs");
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      changed = true;
+    } else if (ApplyHiddenPairs(grid) > 0) {
+      appliedTechniques.push_back("Hidden Pairs");
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      changed = true;
+    } else if (ApplyNakedTriples(grid) > 0) {
+      appliedTechniques.push_back("Naked Triples");
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      changed = true;
+    } else if (ApplyHiddenTriples(grid) > 0) {
+      appliedTechniques.push_back("Hidden Triples");
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      changed = true;
+    } else if (ApplyNakedQuads(grid) > 0) {
+      appliedTechniques.push_back("Naked Quads");
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      changed = true;
+    } else if (ApplyHiddenQuads(grid) > 0) {
+      appliedTechniques.push_back("Hidden Quads");
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      changed = true;
+    } else if (ApplyBlockBlockInteraction(grid) > 0) {
+      appliedTechniques.push_back("Block/Block");
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      changed = true;
+    } else if (ApplyXWing(grid) > 0) {
+      appliedTechniques.push_back("X-Wing");
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      changed = true;
+    } else if (ApplyUniqueRectangle(grid) > 0) {
+      appliedTechniques.push_back("Unique Rectangle");
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      changed = true;
+    } else if (ApplyYWing(grid) > 0) {
+      appliedTechniques.push_back("Y-Wing");
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      changed = true;
+    } else if (ApplySimpleColoring(grid) > 0) {
+      appliedTechniques.push_back("Simple Colouring");
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      changed = true;
+    } else if (ApplySwordfish(grid) > 0) {
+      appliedTechniques.push_back("Swordfish");
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      changed = true;
+    } else if (ApplyXYZWing(grid) > 0) {
+      appliedTechniques.push_back("XYZ-Wing");
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      changed = true;
+    } else if (ApplyXYChain(grid) > 0) {
+      appliedTechniques.push_back("XY-Chain");
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      changed = true;
+    } else if (ApplyJellyfish(grid) > 0) {
+      appliedTechniques.push_back("Jellyfish");
+      ApplyNakedSingles(grid);
+      ApplyHiddenSingles(grid);
+      changed = true;
+    } else if (ApplyForcingChains(grid) > 0) {
+      appliedTechniques.push_back("Forcing Chains");
+      // Forcing Chains may only eliminate candidates; propagate fully
+      while (ApplyNakedSingles(grid) > 0 || ApplyHiddenSingles(grid) > 0) {
+        // Keep propagating
+      }
+      changed = true;
+    }
+
+    if (!changed) break;
+    iteration++;
+  }
+
+  int remaining = CountUnsolvedCells(grid);
+  std::string result;
+
+  if (remaining == 0) {
+    result = "OK";
+  } else {
+    result = "STUCK at " + std::to_string(remaining) + " cells";
+  }
+
+  // Add technique log
+  if (!appliedTechniques.empty()) {
+    result += " | Techniques: ";
+    for (size_t i = 0; i < appliedTechniques.size(); ++i) {
+      if (i > 0) result += ", ";
+      result += appliedTechniques[i];
+    }
+  } else {
+    result += " | No techniques applied";
+  }
+
+  return result;
+}
+
+int TestGenerationAndSolving() {
+  std::cerr << "\n=== Puzzle Generation and Solving Test ===\n" << std::endl;
+
+  std::random_device rd;
+  std::mt19937 rng(rd());
+
+  struct DifficultyTest {
+    Difficulty difficulty;
+    const char* name;
+    int targetScoreMin, targetScoreMax;
+    int puzzlesToTest;
+  };
+
+  const DifficultyTest tests[] = {
+      {Difficulty::kSimple, "Simple", 0, 12, 3},
+      {Difficulty::kEasy, "Easy", 8, 30, 3},
+      {Difficulty::kMild, "Mild", 22, 80, 3},
+      {Difficulty::kModerate, "Moderate", 60, 200, 3},
+      {Difficulty::kHard, "Hard", 150, 500, 3},
+      {Difficulty::kVeryHard, "Very Hard", 400, 1200, 2},
+      {Difficulty::kFiendish, "Fiendish", 900, 3000, 2},
+      {Difficulty::kDiabolical, "Diabolical", 2000, 100000, 1},
+  };
+
+  int totalGenerated = 0, totalSolved = 0, totalScoreMatches = 0, totalFailures = 0;
+
+  for (const auto& test : tests) {
+    std::cerr << "\n[" << test.name << "] Band: " << test.targetScoreMin << "-" << test.targetScoreMax << std::endl;
+
+    for (int i = 0; i < test.puzzlesToTest; ++i) {
+      Puzzle puzzle = GeneratePuzzleWithDifficulty(rng, test.difficulty);
+      bool isEmpty = true;
+      for (int r = 0; r < kGridSize && isEmpty; ++r) {
+        for (int c = 0; c < kGridSize && isEmpty; ++c) {
+          if (puzzle[r][c] != 0) isEmpty = false;
+        }
+      }
+      if (isEmpty) {
+        std::cerr << "  FAIL: Generation returned empty puzzle" << std::endl;
+        totalFailures++;
+        continue;
+      }
+      totalGenerated++;
+
+      // Check solver can complete it with detailed logging
+      std::string solveResult = SolveWithLogging(puzzle);
+      if (solveResult.find("OK") != 0) {
+        std::cerr << "  FAIL: " << solveResult << std::endl;
+        totalFailures++;
+        continue;
+      }
+      std::cerr << "  PASS: " << solveResult << std::endl;
+      totalSolved++;
+
+      // Check score
+      int score = SolveAndScore(puzzle);
+      if (score < test.targetScoreMin || score > test.targetScoreMax) {
+        std::cerr << "    Score " << score << " outside band [" << test.targetScoreMin << ","
+                  << test.targetScoreMax << "]" << std::endl;
+      } else {
+        totalScoreMatches++;
+      }
+    }
+  }
+
+  std::cerr << "\n=== Test Summary ===" << std::endl;
+  std::cerr << "Generated: " << totalGenerated << std::endl;
+  std::cerr << "Solved: " << totalSolved << " (" << (100 * totalSolved / (totalGenerated + 1)) << "%)" << std::endl;
+  std::cerr << "Scores in band: " << totalScoreMatches << " (" << (100 * totalScoreMatches / (totalGenerated + 1))
+            << "%)" << std::endl;
+  std::cerr << "Failures: " << totalFailures << std::endl;
+
+  return totalFailures > 0 ? 1 : 0;
+}
+
 int main(int argc, char** argv) {
   if (argc > 1 && std::string(argv[1]) == "--self-check") {
     return RunHintSelfChecks();
+  }
+  if (argc > 1 && std::string(argv[1]) == "--test-generation") {
+    return TestGenerationAndSolving();
   }
 
   if (!glfwInit()) {
@@ -958,6 +1194,7 @@ int main(int argc, char** argv) {
     bool requestSolveNakedSingles = false;
     bool requestSolveHiddenSingles = false;
     bool requestHint = false;
+    bool requestApplyHint = false;
     bool requestUndo = false;
     bool requestSnapshot = false;
     bool requestLoad = false;
@@ -965,35 +1202,35 @@ int main(int argc, char** argv) {
     if (ImGui::BeginMainMenuBar()) {
       if (ImGui::BeginMenu("File")) {
         if (ImGui::BeginMenu("New Puzzle")) {
-          if (ImGui::MenuItem("Simple", nullptr, uiState.selectedDifficulty == Difficulty::kSimple)) {
+          if (ImGui::MenuItem("Simple      (0-12)", nullptr, uiState.selectedDifficulty == Difficulty::kSimple)) {
             uiState.selectedDifficulty = Difficulty::kSimple;
             requestNewPuzzle = true;
           }
-          if (ImGui::MenuItem("Easy", nullptr, uiState.selectedDifficulty == Difficulty::kEasy)) {
+          if (ImGui::MenuItem("Easy        (8-30)", nullptr, uiState.selectedDifficulty == Difficulty::kEasy)) {
             uiState.selectedDifficulty = Difficulty::kEasy;
             requestNewPuzzle = true;
           }
-          if (ImGui::MenuItem("Mild", nullptr, uiState.selectedDifficulty == Difficulty::kMild)) {
+          if (ImGui::MenuItem("Mild       (22-80)", nullptr, uiState.selectedDifficulty == Difficulty::kMild)) {
             uiState.selectedDifficulty = Difficulty::kMild;
             requestNewPuzzle = true;
           }
-          if (ImGui::MenuItem("Moderate", nullptr, uiState.selectedDifficulty == Difficulty::kModerate)) {
+          if (ImGui::MenuItem("Moderate  (60-200)", nullptr, uiState.selectedDifficulty == Difficulty::kModerate)) {
             uiState.selectedDifficulty = Difficulty::kModerate;
             requestNewPuzzle = true;
           }
-          if (ImGui::MenuItem("Hard", nullptr, uiState.selectedDifficulty == Difficulty::kHard)) {
+          if (ImGui::MenuItem("Hard     (150-500)", nullptr, uiState.selectedDifficulty == Difficulty::kHard)) {
             uiState.selectedDifficulty = Difficulty::kHard;
             requestNewPuzzle = true;
           }
-          if (ImGui::MenuItem("Very Hard", nullptr, uiState.selectedDifficulty == Difficulty::kVeryHard)) {
+          if (ImGui::MenuItem("Very Hard (400-1200)", nullptr, uiState.selectedDifficulty == Difficulty::kVeryHard)) {
             uiState.selectedDifficulty = Difficulty::kVeryHard;
             requestNewPuzzle = true;
           }
-          if (ImGui::MenuItem("Fiendish", nullptr, uiState.selectedDifficulty == Difficulty::kFiendish)) {
+          if (ImGui::MenuItem("Fiendish (900-3000)", nullptr, uiState.selectedDifficulty == Difficulty::kFiendish)) {
             uiState.selectedDifficulty = Difficulty::kFiendish;
             requestNewPuzzle = true;
           }
-          if (ImGui::MenuItem("Diabolical", nullptr, uiState.selectedDifficulty == Difficulty::kDiabolical)) {
+          if (ImGui::MenuItem("Diabolical  (2000+)", nullptr, uiState.selectedDifficulty == Difficulty::kDiabolical)) {
             uiState.selectedDifficulty = Difficulty::kDiabolical;
             requestNewPuzzle = true;
           }
@@ -1033,8 +1270,9 @@ int main(int argc, char** argv) {
           uiState.statusMessage = uiState.showWrongEntrySlash ? "Wrong-entry slash enabled" : "Wrong-entry slash disabled";
           uiState.statusFrames = 200;
         }
-        if (ImGui::MenuItem("Hint", "?")) {
-          requestHint = true;
+        if (ImGui::MenuItem(uiState.currentHint.revealPhase == 3 ? "Apply Hint" : "Hint", "?")) {
+          if (uiState.currentHint.revealPhase == 3) requestApplyHint = true;
+          else requestHint = true;
         }
         ImGui::EndMenu();
       }
@@ -1076,9 +1314,18 @@ int main(int argc, char** argv) {
       requestLoad = true;
     }
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(120.0f);
+    ImGui::SetNextItemWidth(200.0f);
     int difficultyIdx = static_cast<int>(uiState.selectedDifficulty);
-    const char* difficultyItems[] = {"Simple", "Easy", "Mild", "Moderate", "Hard", "Very Hard", "Fiendish", "Diabolical"};
+    const char* difficultyItems[] = {
+      "Simple      (0-12)",
+      "Easy        (8-30)",
+      "Mild       (22-80)",
+      "Moderate  (60-200)",
+      "Hard     (150-500)",
+      "Very Hard (400-1200)",
+      "Fiendish (900-3000)",
+      "Diabolical  (2000+)",
+    };
     if (ImGui::Combo("##difficulty", &difficultyIdx, difficultyItems, 8)) {
       uiState.selectedDifficulty = static_cast<Difficulty>(difficultyIdx);
     }
@@ -1109,8 +1356,10 @@ int main(int argc, char** argv) {
       uiState.statusFrames = 200;
     }
     ImGui::SameLine();
-    if (ImGui::Button("Hint (?)", ImVec2(95, 34))) {
-      requestHint = true;
+    const bool hintAtApplyPhase = uiState.currentHint.revealPhase == 3;
+    if (ImGui::Button(hintAtApplyPhase ? "Apply" : "Hint (?)", ImVec2(95, 34))) {
+      if (hintAtApplyPhase) requestApplyHint = true;
+      else requestHint = true;
     }
     ImGui::SameLine(0.0f, 22.0f);
     ImGui::Text("Q/E/R switch mode");
@@ -1147,7 +1396,8 @@ int main(int argc, char** argv) {
       requestUndo = true;
     }
     if (ImGui::IsKeyPressed(ImGuiKey_Slash)) {
-      requestHint = true;
+      if (uiState.currentHint.revealPhase == 3) requestApplyHint = true;
+      else requestHint = true;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_RightArrow) || ImGui::IsKeyPressed(ImGuiKey_D)) {
@@ -1177,6 +1427,21 @@ int main(int argc, char** argv) {
       std::cerr << "  Pointing Pairs: " << puzzleState.score.pointingPairs << std::endl;
       std::cerr << "  Box/Line: " << puzzleState.score.boxLineReductions << std::endl;
       std::cerr << "  Naked Pairs: " << puzzleState.score.nakedPairs << std::endl;
+      std::cerr << "  Hidden Pairs: " << puzzleState.score.hiddenPairs << std::endl;
+      std::cerr << "  Naked Triples: " << puzzleState.score.nakedTriples << std::endl;
+      std::cerr << "  Hidden Triples: " << puzzleState.score.hiddenTriples << std::endl;
+      std::cerr << "  Naked Quads: " << puzzleState.score.nakedQuads << std::endl;
+      std::cerr << "  Hidden Quads: " << puzzleState.score.hiddenQuads << std::endl;
+      std::cerr << "  Block/Block: " << puzzleState.score.blockBlockInteractions << std::endl;
+      std::cerr << "  X-Wing: " << puzzleState.score.xWings << std::endl;
+      std::cerr << "  Unique Rectangle: " << puzzleState.score.uniqueRectangles << std::endl;
+      std::cerr << "  Y-Wing: " << puzzleState.score.yWings << std::endl;
+      std::cerr << "  Simple Colouring: " << puzzleState.score.simpleColourings << std::endl;
+      std::cerr << "  Swordfish: " << puzzleState.score.swordfishes << std::endl;
+      std::cerr << "  XYZ-Wing: " << puzzleState.score.xyzWings << std::endl;
+      std::cerr << "  XY-Chain: " << puzzleState.score.xyChains << std::endl;
+      std::cerr << "  Jellyfish: " << puzzleState.score.jellyfishes << std::endl;
+      std::cerr << "  Forcing Chains: " << puzzleState.score.forcingChains << std::endl;
 
       uiState.undoHistory.clear();
       uiState.currentHint = {};
@@ -1256,6 +1521,14 @@ int main(int argc, char** argv) {
         uiState.statusMessage = "Hint: " + uiState.currentHint.techniqueName + " (digits highlighted)";
         uiState.statusFrames = 400;
       }
+    }
+    if (requestApplyHint && uiState.currentHint.revealPhase == 3) {
+      const std::string name = uiState.currentHint.techniqueName;
+      PushUndoState(uiState.undoHistory, puzzleState.grid);
+      ApplyHint(puzzleState.grid, uiState.currentHint);
+      uiState.statusMessage = "Applied: " + name;
+      uiState.statusFrames = 300;
+      uiState.currentHint = {};
     }
 
     Cell& selected = puzzleState.grid[uiState.selectedRow][uiState.selectedCol];
@@ -1426,7 +1699,7 @@ int main(int argc, char** argv) {
         if (!loaded.ok) {
           uiState.loadErrorMessage = loaded.errorMessage;
         } else {
-          PushUndoState(uiState.undoHistory, puzzleState.grid);
+          uiState.undoHistory.clear();
           puzzleState.grid = loaded.grid;
           puzzleState.givens = loaded.givens;
           puzzleState.hasSolution = ComputeSolutionFromGivens(puzzleState.givens, puzzleState.solution);
@@ -1444,7 +1717,7 @@ int main(int argc, char** argv) {
           uiState.mode = loaded.mode;
           uiState.selectedRow = std::clamp(loaded.selectedRow, 0, 8);
           uiState.selectedCol = std::clamp(loaded.selectedCol, 0, 8);
-          uiState.currentHint = loaded.hint;
+          uiState.currentHint = {};  // Clear hint; it may be stale if pencil marks changed
           uiState.loadErrorMessage.clear();
           memset(uiState.loadInputBuf, 0, uiState.kLoadInputBufSize);
           uiState.statusMessage = "Snapshot loaded";
@@ -1473,20 +1746,66 @@ int main(int argc, char** argv) {
       ImGui::Text("Total Score: %d", puzzleState.score.totalScore);
       ImGui::Spacing();
 
-      if (puzzleState.score.nakedSingles > 0) {
-        ImGui::Text("Naked Singles:       %4d points", puzzleState.score.nakedSingles);
+      const auto& sc = puzzleState.score;
+      if (sc.nakedSingles > 0) {
+        ImGui::Text("Naked Singles:      %3d x   1 = %4d", sc.nakedSingles / 1,   sc.nakedSingles);
       }
-      if (puzzleState.score.hiddenSingles > 0) {
-        ImGui::Text("Hidden Singles:      %4d points", puzzleState.score.hiddenSingles);
+      if (sc.hiddenSingles > 0) {
+        ImGui::Text("Hidden Singles:     %3d x   3 = %4d", sc.hiddenSingles / 3,  sc.hiddenSingles);
       }
-      if (puzzleState.score.pointingPairs > 0) {
-        ImGui::Text("Pointing Pairs:      %4d points", puzzleState.score.pointingPairs);
+      if (sc.pointingPairs > 0) {
+        ImGui::Text("Pointing Pairs:     %3d x  10 = %4d", sc.pointingPairs / 10, sc.pointingPairs);
       }
-      if (puzzleState.score.boxLineReductions > 0) {
-        ImGui::Text("Box/Line Reduction:  %4d points", puzzleState.score.boxLineReductions);
+      if (sc.boxLineReductions > 0) {
+        ImGui::Text("Box/Line Reduction: %3d x  10 = %4d", sc.boxLineReductions / 10, sc.boxLineReductions);
       }
-      if (puzzleState.score.nakedPairs > 0) {
-        ImGui::Text("Naked Pairs:         %4d points", puzzleState.score.nakedPairs);
+      if (sc.nakedPairs > 0) {
+        ImGui::Text("Naked Pairs:        %3d x  15 = %4d", sc.nakedPairs / 15,    sc.nakedPairs);
+      }
+      if (sc.hiddenPairs > 0) {
+        ImGui::Text("Hidden Pairs:       %3d x  20 = %4d", sc.hiddenPairs / 20,   sc.hiddenPairs);
+      }
+      if (sc.nakedTriples > 0) {
+        ImGui::Text("Naked Triples:      %3d x  30 = %4d", sc.nakedTriples / 30,  sc.nakedTriples);
+      }
+      if (sc.hiddenTriples > 0) {
+        ImGui::Text("Hidden Triples:     %3d x  40 = %4d", sc.hiddenTriples / 40, sc.hiddenTriples);
+      }
+      if (sc.nakedQuads > 0) {
+        ImGui::Text("Naked Quads:        %3d x  50 = %4d", sc.nakedQuads / 50,    sc.nakedQuads);
+      }
+      if (sc.hiddenQuads > 0) {
+        ImGui::Text("Hidden Quads:       %3d x  60 = %4d", sc.hiddenQuads / 60,   sc.hiddenQuads);
+      }
+      if (sc.blockBlockInteractions > 0) {
+        ImGui::Text("Block/Block:        %3d x  25 = %4d", sc.blockBlockInteractions / 25, sc.blockBlockInteractions);
+      }
+      if (sc.xWings > 0) {
+        ImGui::Text("X-Wing:             %3d x  80 = %4d", sc.xWings / 80,        sc.xWings);
+      }
+      if (sc.uniqueRectangles > 0) {
+        ImGui::Text("Unique Rectangle:   %3d x  70 = %4d", sc.uniqueRectangles / 70, sc.uniqueRectangles);
+      }
+      if (sc.yWings > 0) {
+        ImGui::Text("Y-Wing:             %3d x 100 = %4d", sc.yWings / 100,       sc.yWings);
+      }
+      if (sc.simpleColourings > 0) {
+        ImGui::Text("Simple Colouring:   %3d x 120 = %4d", sc.simpleColourings / 120, sc.simpleColourings);
+      }
+      if (sc.swordfishes > 0) {
+        ImGui::Text("Swordfish:          %3d x 140 = %4d", sc.swordfishes / 140,  sc.swordfishes);
+      }
+      if (sc.xyzWings > 0) {
+        ImGui::Text("XYZ-Wing:           %3d x 150 = %4d", sc.xyzWings / 150,     sc.xyzWings);
+      }
+      if (sc.xyChains > 0) {
+        ImGui::Text("XY-Chain:           %3d x 200 = %4d", sc.xyChains / 200,     sc.xyChains);
+      }
+      if (sc.jellyfishes > 0) {
+        ImGui::Text("Jellyfish:          %3d x 200 = %4d", sc.jellyfishes / 200,  sc.jellyfishes);
+      }
+      if (sc.forcingChains > 0) {
+        ImGui::Text("Forcing Chains:     %3d x 300 = %4d", sc.forcingChains / 300, sc.forcingChains);
       }
 
       ImGui::Spacing();

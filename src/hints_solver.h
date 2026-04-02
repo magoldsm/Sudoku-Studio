@@ -14,6 +14,18 @@ enum class SolvingTechnique {
   kHiddenPair = 6,
   kNakedTriple = 7,
   kHiddenTriple = 8,
+  kNakedQuad = 9,
+  kHiddenQuad = 10,
+  kBlockBlockInteraction = 11,
+  kXWing = 12,
+  kUniqueRectangle = 13,
+  kYWing = 14,
+  kSimpleColouring = 15,
+  kSwordfish = 16,
+  kXYZWing = 17,
+  kXYChain = 18,
+  kJellyfish = 19,
+  kForcingChains = 20,
 };
 
 // Puzzle scoring details
@@ -27,6 +39,18 @@ struct PuzzleScore {
   int hiddenPairs = 0;
   int nakedTriples = 0;
   int hiddenTriples = 0;
+  int nakedQuads = 0;
+  int hiddenQuads = 0;
+  int blockBlockInteractions = 0;
+  int xWings = 0;
+  int uniqueRectangles = 0;
+  int yWings = 0;
+  int simpleColourings = 0;
+  int swordfishes = 0;
+  int xyzWings = 0;
+  int xyChains = 0;
+  int jellyfishes = 0;
+  int forcingChains = 0;
 };
 
 int GetTechniqueScore(SolvingTechnique technique);
@@ -36,6 +60,8 @@ bool ContainsCell(const std::vector<HintCell>& cells, int row, int col);
 
 // Returns the next supported hint in difficulty order.
 Hint GenerateHint(const Grid& grid);
+// Applies the technique named in hint.techniqueName; returns number of changes.
+int ApplyHint(Grid& grid, const Hint& hint);
 // Rebuilds legal pencil marks for unsolved cells; returns changed cell count.
 int ApplyAutoPencil(Grid& grid);
 // Applies one pass of placements; returns number of placed values.
@@ -48,6 +74,18 @@ int ApplyNakedPairs(Grid& grid);
 int ApplyHiddenPairs(Grid& grid);
 int ApplyNakedTriples(Grid& grid);
 int ApplyHiddenTriples(Grid& grid);
+int ApplyNakedQuads(Grid& grid);
+int ApplyHiddenQuads(Grid& grid);
+int ApplyBlockBlockInteraction(Grid& grid);
+int ApplyXWing(Grid& grid);
+int ApplyUniqueRectangle(Grid& grid);
+int ApplyYWing(Grid& grid);
+int ApplySimpleColoring(Grid& grid);
+int ApplySwordfish(Grid& grid);
+int ApplyXYZWing(Grid& grid);
+int ApplyXYChain(Grid& grid);
+int ApplyJellyfish(Grid& grid);
+int ApplyForcingChains(Grid& grid);
 // Repeats single-pass placement until stable; returns total placements.
 int AutoSolveNakedSingles(Grid& grid);
 int AutoSolveHiddenSingles(Grid& grid);

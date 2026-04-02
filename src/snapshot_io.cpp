@@ -196,7 +196,15 @@ SnapshotLoadResult DeserializeSnapshot(const std::string& text) {
   std::string line;
 
   // Verify header before parsing any body content.
-  if (!std::getline(stream, line) || line != "format=sudoku-studio-v1") {
+  if (!std::getline(stream, line)) {
+    result.errorMessage = "Missing or wrong format header. Expected 'format=sudoku-studio-v1' on first line.";
+    return result;
+  }
+  // Strip trailing whitespace (including \r from Windows line endings)
+  while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) {
+    line.pop_back();
+  }
+  if (line != "format=sudoku-studio-v1") {
     result.errorMessage = "Missing or wrong format header. Expected 'format=sudoku-studio-v1' on first line.";
     return result;
   }
