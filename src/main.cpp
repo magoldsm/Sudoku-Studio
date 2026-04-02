@@ -586,9 +586,6 @@ Grid BuildGrid(const Puzzle& puzzle) {
       grid[r][c].fixed = (puzzle[r][c] != 0);
     }
   }
-  // Initialize pencil marks with legal candidates for all empty cells.
-  // This ensures hint detectors have complete candidate information.
-  ApplyAutoPencil(grid);
   return grid;
 }
 
