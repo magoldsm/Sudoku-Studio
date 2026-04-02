@@ -59,7 +59,7 @@ const char* DifficultyName(Difficulty difficulty) {
   return "Unknown";
 }
 
-void DrawTechniquePanel(const Hint& currentHint) {
+void DrawTechniquePanel(const Hint& currentHint, float width) {
   struct TechniqueEntry {
     const char* name;
     int level;
@@ -86,11 +86,12 @@ void DrawTechniquePanel(const Hint& currentHint) {
       {"XY-Chain", 7},
   }};
 
-  ImGui::BeginChild("TechniquePanel", ImVec2(0.0f, 220.0f), true,
+  // If width is 0, use full available width; otherwise use specified width
+  // Height matches board area (648 + 18 = 666) to avoid scrolling
+  float panelWidth = (width > 0.0f) ? width : 0.0f;
+  ImGui::BeginChild("TechniquePanel", ImVec2(panelWidth, 666.0f), true,
                     ImGuiWindowFlags_NoScrollWithMouse);
   ImGui::TextUnformatted("Technique Panel");
-  ImGui::SameLine();
-  ImGui::TextDisabled("(Sadman-style order)");
   ImGui::Separator();
 
   const bool hasActive = !currentHint.techniqueName.empty() &&

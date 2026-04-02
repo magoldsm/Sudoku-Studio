@@ -1343,6 +1343,10 @@ int main(int argc, char** argv) {
 
     ImGui::PushFont(uiFont);
 
+    // Workspace sizing variables
+    static ImVec2 measuredWorkspaceSize(0, 0);
+    static bool workspaceSizeMeasured = false;
+
     bool requestNewPuzzle = false;
     bool requestAutoPencil = false;
     bool requestSolveNakedSingles = false;
@@ -1761,8 +1765,8 @@ int main(int argc, char** argv) {
     const bool solved = IsSolved(puzzleState.grid);
     const int highlightDigit = selected.value;
 
-    ImGui::SetNextWindowPos(ImVec2(14, 128), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x - 28, io.DisplaySize.y - 140), ImGuiCond_Always);
+    ImGui::SetNextWindowPos(ImVec2(0, 120), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(1150, 820), ImGuiCond_Always);
     ImGui::Begin("Sudoku Workspace", nullptr,
                  ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
                      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
@@ -1789,11 +1793,14 @@ int main(int argc, char** argv) {
               &puzzleState.solution, puzzleState.hasSolution, uiState.undoHistory, solved,
               uiState.currentHint, digitFont, noteFont);
 
+    // Position Technique Panel to the right of Board/Color Tags (on same row)
+    ImGui::SameLine(0.0f, kBoardPanelMargin);
+    DrawTechniquePanel(uiState.currentHint, kTechniquePanelWidth);
+
     ImGui::Separator();
     ImGui::Text(
         "Controls: arrows/WASD move | Q/E/R modes | 1-9 input | 0/Backspace/Delete clear | Ctrl+Z undo | B pairs | ? hint");
     ImGui::Text("Selected: row %d col %d", uiState.selectedRow + 1, uiState.selectedCol + 1);
-    DrawTechniquePanel(uiState.currentHint);
 
     if (solved) {
       ImGui::TextColored(ImVec4(0.18f, 0.53f, 0.31f, 1.0f), "Solved: grid is complete and valid.");
@@ -1984,7 +1991,16 @@ int main(int argc, char** argv) {
       ImGui::EndPopup();
     }
 
+    // Measure workspace window size before ending it
+    ImVec2 windowSize = ImGui::GetWindowSize();
+
     ImGui::End();
+
+    // Record the measured size (update each frame to account for content changes)
+    if (windowSize.x > 0 && windowSize.y > 0) {
+      measuredWorkspaceSize = windowSize;
+      workspaceSizeMeasured = true;
+    }
 
     if (uiState.statusFrames > 0) {
       --uiState.statusFrames;

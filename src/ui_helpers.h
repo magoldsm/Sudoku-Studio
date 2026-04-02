@@ -11,7 +11,8 @@ bool IsClearPressed();
 const char* ModeName(InputMode mode);
 const char* DifficultyName(Difficulty difficulty);
 // Renders ordered technique list and highlights the active hint technique.
-void DrawTechniquePanel(const Hint& currentHint);
+// If width > 0, uses that width; otherwise uses full available width.
+void DrawTechniquePanel(const Hint& currentHint, float width = 0.0f);
 
 // Drawing helpers
 void DrawColorTagPanel(int& activeColor, InputMode& mode,

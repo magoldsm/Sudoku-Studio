@@ -5,8 +5,8 @@
 namespace sudoku {
 
 // Window dimensions
-constexpr float kWindowWidth = 1280.0f;
-constexpr float kWindowHeight = 1200.0f;
+constexpr float kWindowWidth = 1150.0f;  // Board + Color Tags + Technique Panel + margins
+constexpr float kWindowHeight = 940.0f;   // Menu (24) + Toolbar (96) + Board + Controls + padding
 constexpr float kToolbarHeight = 96.0f;
 constexpr float kMainMenuHeight = 24.0f;
 
@@ -47,8 +47,9 @@ constexpr float kUIFontSize = 22.0f;
 constexpr float kDigitFontSize = 40.0f;
 constexpr float kPencilMarkFontSize = 16.0f;
 
-// Tag panel
+// Tag and Technique panels
 constexpr float kTagPanelWidth = 164.0f;
+constexpr float kTechniquePanelWidth = 280.0f;  // Wide enough to read full technique names
 constexpr float kTagButtonWidth = 108.0f;
 constexpr float kTagButtonHeight = 30.0f;
 constexpr ImVec4 kColorActiveButtonOverride = ImVec4(0.24f, 0.52f, 0.72f, 1.0f);
