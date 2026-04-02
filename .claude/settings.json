@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make)",
+      "Bash(./build/sudoku_ui --hint-stress-test 5)",
+      "Bash(timeout 10 ./build/sudoku_ui --hint-stress-test 3)"
+    ]
+  }
+}

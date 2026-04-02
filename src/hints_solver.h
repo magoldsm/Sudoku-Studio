@@ -1,5 +1,6 @@
 #pragma once
 
+#include "hints_candidates.h"
 #include "sudoku_core.h"
 
 namespace sudoku {
