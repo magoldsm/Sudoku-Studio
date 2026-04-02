@@ -57,17 +57,17 @@ constexpr float kWorkspaceContentWidth =
     kTechniquePanelWidth;  // 1128
 
 // Vertical layout: [Title section] [Board + Panels] [Control section]
-// Text line height and spacing: Windows (high DPI) needs more space, Linux can use original
+// Text line height and spacing: Windows (high DPI) needs more space, Linux minimal
 #ifdef _WIN32
-  constexpr float kTextLineHeight = 32.0f;   // Windows: accommodate scaled fonts
-  constexpr float kSeparatorHeight = 12.0f;
-  constexpr float kSectionSpacingV = 12.0f;
-  constexpr float kWorkspacePaddingV = 24.0f;
-#else
-  constexpr float kTextLineHeight = 26.0f;   // Linux: modest increase from 24 for spacing
+  constexpr float kTextLineHeight = 30.0f;   // Windows: accommodate scaled fonts
   constexpr float kSeparatorHeight = 10.0f;
-  constexpr float kSectionSpacingV = 9.0f;
-  constexpr float kWorkspacePaddingV = 18.0f;
+  constexpr float kSectionSpacingV = 10.0f;
+  constexpr float kWorkspacePaddingV = 20.0f;
+#else
+  constexpr float kTextLineHeight = 24.0f;   // Linux: original size (exact fit)
+  constexpr float kSeparatorHeight = 8.0f;
+  constexpr float kSectionSpacingV = 8.0f;
+  constexpr float kWorkspacePaddingV = 16.0f;
 #endif
 
 // Title section: "Sudoku Studio - [Difficulty] Score: [Score]" + "Sharp text..." + spacing
