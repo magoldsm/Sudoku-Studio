@@ -489,6 +489,16 @@ Puzzle GeneratePuzzleWithDifficulty(std::mt19937& rng, Difficulty difficulty) {
       int score = SolveAndScore(current);
       int scoreDistance = std::abs(score - (targetScoreMin + targetScoreMax) / 2);
 
+      // Verify the puzzle is completely solvable, not just scored
+      {
+        Grid testGrid = BuildGrid(current);
+        ApplyAutoPencil(testGrid);
+        Puzzle tempPuzzle = current;
+        if (!SolveComprehensive(tempPuzzle)) {
+          continue;  // Reject unsolvable puzzles
+        }
+      }
+
       // Check puzzleFound less frequently
       if ((attempt % 10 == 0) && puzzleFound) {
         return;
@@ -872,107 +882,143 @@ std::string SolveWithLogging(Puzzle puzzle) {
   ApplyAutoPencil(grid);
 
   std::vector<const char*> appliedTechniques;
-  int iteration = 0;
   constexpr int kMaxIterations = 200;
 
-  while (iteration < kMaxIterations) {
+  for (int i = 0; i < kMaxIterations; ++i) {
     bool changed = false;
 
-    // Try each technique in order
-    if (ApplyNakedSingles(grid) > 0) {
+    // Exhaust each technique completely before moving to the next
+    while (ApplyNakedSingles(grid) > 0) {
       appliedTechniques.push_back("Naked Singles");
       changed = true;
-    } else if (ApplyHiddenSingles(grid) > 0) {
+    }
+
+    while (ApplyHiddenSingles(grid) > 0) {
       appliedTechniques.push_back("Hidden Singles");
       changed = true;
-    } else if (ApplyPointingPairs(grid) > 0) {
+    }
+
+    while (ApplyPointingPairs(grid) > 0) {
       appliedTechniques.push_back("Pointing Pairs");
       ApplyNakedSingles(grid);
       ApplyHiddenSingles(grid);
       changed = true;
-    } else if (ApplyBoxLineReduction(grid) > 0) {
+    }
+
+    while (ApplyBoxLineReduction(grid) > 0) {
       appliedTechniques.push_back("Box/Line Reduction");
       ApplyNakedSingles(grid);
       ApplyHiddenSingles(grid);
       changed = true;
-    } else if (ApplyNakedPairs(grid) > 0) {
+    }
+
+    while (ApplyNakedPairs(grid) > 0) {
       appliedTechniques.push_back("Naked Pairs");
       ApplyNakedSingles(grid);
       ApplyHiddenSingles(grid);
       changed = true;
-    } else if (ApplyHiddenPairs(grid) > 0) {
+    }
+
+    while (ApplyHiddenPairs(grid) > 0) {
       appliedTechniques.push_back("Hidden Pairs");
       ApplyNakedSingles(grid);
       ApplyHiddenSingles(grid);
       changed = true;
-    } else if (ApplyNakedTriples(grid) > 0) {
+    }
+
+    while (ApplyNakedTriples(grid) > 0) {
       appliedTechniques.push_back("Naked Triples");
       ApplyNakedSingles(grid);
       ApplyHiddenSingles(grid);
       changed = true;
-    } else if (ApplyHiddenTriples(grid) > 0) {
+    }
+
+    while (ApplyHiddenTriples(grid) > 0) {
       appliedTechniques.push_back("Hidden Triples");
       ApplyNakedSingles(grid);
       ApplyHiddenSingles(grid);
       changed = true;
-    } else if (ApplyNakedQuads(grid) > 0) {
+    }
+
+    while (ApplyNakedQuads(grid) > 0) {
       appliedTechniques.push_back("Naked Quads");
       ApplyNakedSingles(grid);
       ApplyHiddenSingles(grid);
       changed = true;
-    } else if (ApplyHiddenQuads(grid) > 0) {
+    }
+
+    while (ApplyHiddenQuads(grid) > 0) {
       appliedTechniques.push_back("Hidden Quads");
       ApplyNakedSingles(grid);
       ApplyHiddenSingles(grid);
       changed = true;
-    } else if (ApplyBlockBlockInteraction(grid) > 0) {
+    }
+
+    while (ApplyBlockBlockInteraction(grid) > 0) {
       appliedTechniques.push_back("Block/Block");
       ApplyNakedSingles(grid);
       ApplyHiddenSingles(grid);
       changed = true;
-    } else if (ApplyXWing(grid) > 0) {
+    }
+
+    while (ApplyXWing(grid) > 0) {
       appliedTechniques.push_back("X-Wing");
       ApplyNakedSingles(grid);
       ApplyHiddenSingles(grid);
       changed = true;
-    } else if (ApplyUniqueRectangle(grid) > 0) {
+    }
+
+    while (ApplyUniqueRectangle(grid) > 0) {
       appliedTechniques.push_back("Unique Rectangle");
       ApplyNakedSingles(grid);
       ApplyHiddenSingles(grid);
       changed = true;
-    } else if (ApplyYWing(grid) > 0) {
+    }
+
+    while (ApplyYWing(grid) > 0) {
       appliedTechniques.push_back("Y-Wing");
       ApplyNakedSingles(grid);
       ApplyHiddenSingles(grid);
       changed = true;
-    } else if (ApplySimpleColoring(grid) > 0) {
+    }
+
+    while (ApplySimpleColoring(grid) > 0) {
       appliedTechniques.push_back("Simple Colouring");
       ApplyNakedSingles(grid);
       ApplyHiddenSingles(grid);
       changed = true;
-    } else if (ApplySwordfish(grid) > 0) {
+    }
+
+    while (ApplySwordfish(grid) > 0) {
       appliedTechniques.push_back("Swordfish");
       ApplyNakedSingles(grid);
       ApplyHiddenSingles(grid);
       changed = true;
-    } else if (ApplyXYZWing(grid) > 0) {
+    }
+
+    while (ApplyXYZWing(grid) > 0) {
       appliedTechniques.push_back("XYZ-Wing");
       ApplyNakedSingles(grid);
       ApplyHiddenSingles(grid);
       changed = true;
-    } else if (ApplyXYChain(grid) > 0) {
+    }
+
+    while (ApplyXYChain(grid) > 0) {
       appliedTechniques.push_back("XY-Chain");
       ApplyNakedSingles(grid);
       ApplyHiddenSingles(grid);
       changed = true;
-    } else if (ApplyJellyfish(grid) > 0) {
+    }
+
+    while (ApplyJellyfish(grid) > 0) {
       appliedTechniques.push_back("Jellyfish");
       ApplyNakedSingles(grid);
       ApplyHiddenSingles(grid);
       changed = true;
-    } else if (ApplyForcingChains(grid) > 0) {
+    }
+
+    while (ApplyForcingChains(grid) > 0) {
       appliedTechniques.push_back("Forcing Chains");
-      // Forcing Chains may only eliminate candidates; propagate fully
       while (ApplyNakedSingles(grid) > 0 || ApplyHiddenSingles(grid) > 0) {
         // Keep propagating
       }
@@ -980,7 +1026,6 @@ std::string SolveWithLogging(Puzzle puzzle) {
     }
 
     if (!changed) break;
-    iteration++;
   }
 
   int remaining = CountUnsolvedCells(grid);
