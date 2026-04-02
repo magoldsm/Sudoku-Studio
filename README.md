@@ -13,29 +13,101 @@ It combines a puzzle workspace, interactive solving tools, and an advanced hint 
 
 ## Build
 
+### Linux / macOS
+
 ```bash
 cmake -S . -B build
 cmake --build build -j
 ```
 
-## Run
+### Windows
+
+**Prerequisites:**
+- CMake 3.15+ ([cmake.org](https://cmake.org/download/))
+- C++ compiler: MSVC (Visual Studio 2019+), MinGW-w64, or Clang
+- Git (for dependencies)
+
+**With MSVC (Visual Studio):**
+
+CMake will auto-detect your installed Visual Studio version. Use one of:
 
 ```bash
+# Auto-detect latest Visual Studio version
+cmake -S . -B build -G "Visual Studio"
+cmake --build build --config Release
+.\build\Release\sudoku_ui.exe
+```
+
+Or specify your version explicitly:
+```bash
+# For Visual Studio 2022:
+cmake -S . -B build -G "Visual Studio 17 2022"
+
+# For Visual Studio 2026:
+cmake -S . -B build -G "Visual Studio 18 2025"
+
+# For other versions, check available generators:
+cmake --help
+```
+
+**With MinGW:**
+```bash
+cmake -S . -B build -G "MinGW Makefiles"
+cmake --build build
+.\build\sudoku_ui.exe
+```
+
+**With Clang/LLVM:**
+```bash
+cmake -S . -B build -G "Ninja" -DCMAKE_CXX_COMPILER=clang++
+cmake --build build
+.\build\sudoku_ui.exe
+```
+
+All dependencies (GLFW, Dear ImGui, OpenGL) are fetched automatically by CMake and are fully cross-platform. No additional configuration needed.
+
+## Run
+
+**Linux / macOS:**
+```bash
 ./build/sudoku_ui
+```
+
+**Windows:**
+```bash
+.\build\Release\sudoku_ui.exe
+# or if using MinGW:
+.\build\sudoku_ui.exe
 ```
 
 ## Run Tests
 
 **Detector Self-Check** — validates hint detection consistency:
+
+Linux / macOS:
 ```bash
 ./build/sudoku_ui --self-check
 ```
+
+Windows:
+```bash
+.\build\Release\sudoku_ui.exe --self-check
+```
+
 Reports detector coverage and failures across generated puzzle states.
 
 **Generator/Solver Synchronization Test** — validates puzzle generation and solving:
+
+Linux / macOS:
 ```bash
 ./build/sudoku_ui --test-generation
 ```
+
+Windows:
+```bash
+.\build\Release\sudoku_ui.exe --test-generation
+```
+
 Generates 20 puzzles across all difficulty bands and verifies 100% are solvable to completion using the same techniques.
 
 ## Core Features
