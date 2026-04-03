@@ -2734,7 +2734,6 @@ int ApplyHintWithCandidates(Grid& grid, const Hint& hint, const CandidateGrid& c
 
   // For basic techniques, manually apply using the provided candidates
   if (name == "Naked Single") {
-    int changes = 0;
     for (int r = 0; r < kGridSize; ++r) {
       for (int c = 0; c < kGridSize; ++c) {
         if (grid[r][c].value == 0 && candidates[r][c].count() == 1) {
@@ -2743,18 +2742,16 @@ int ApplyHintWithCandidates(Grid& grid, const Hint& hint, const CandidateGrid& c
               grid[r][c].value = d + 1;
               grid[r][c].pencil.reset();
               RemoveDigitFromPeerPencils(grid, r, c, d + 1);
-              changes++;
-              break;
+              return 1;  // Apply only one hint at a time
             }
           }
         }
       }
     }
-    return changes;
+    return 0;
   }
 
   if (name == "Hidden Single") {
-    int changes = 0;
     // Check rows
     for (int r = 0; r < kGridSize; ++r) {
       for (int d = 0; d < 9; ++d) {
@@ -2770,7 +2767,7 @@ int ApplyHintWithCandidates(Grid& grid, const Hint& hint, const CandidateGrid& c
           grid[r][col].value = d + 1;
           grid[r][col].pencil.reset();
           RemoveDigitFromPeerPencils(grid, r, col, d + 1);
-          changes++;
+          return 1;  // Apply only one hint at a time
         }
       }
     }
@@ -2789,7 +2786,7 @@ int ApplyHintWithCandidates(Grid& grid, const Hint& hint, const CandidateGrid& c
           grid[row][c].value = d + 1;
           grid[row][c].pencil.reset();
           RemoveDigitFromPeerPencils(grid, row, c, d + 1);
-          changes++;
+          return 1;  // Apply only one hint at a time
         }
       }
     }
@@ -2813,11 +2810,11 @@ int ApplyHintWithCandidates(Grid& grid, const Hint& hint, const CandidateGrid& c
           grid[row][col].value = d + 1;
           grid[row][col].pencil.reset();
           RemoveDigitFromPeerPencils(grid, row, col, d + 1);
-          changes++;
+          return 1;  // Apply only one hint at a time
         }
       }
     }
-    return changes;
+    return 0;
   }
 
   // For other techniques, fall back to regular ApplyHint
