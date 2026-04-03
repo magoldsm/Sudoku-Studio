@@ -25,40 +25,6 @@ bool IsClearPressed() {
          ImGui::IsKeyPressed(ImGuiKey_Backspace) || ImGui::IsKeyPressed(ImGuiKey_Delete);
 }
 
-const char* ModeName(InputMode mode) {
-  switch (mode) {
-    case InputMode::kDigit:
-      return "Digit";
-    case InputMode::kPencil:
-      return "Pencil";
-    case InputMode::kColor:
-      return "Color";
-  }
-  return "Unknown";
-}
-
-const char* DifficultyName(Difficulty difficulty) {
-  switch (difficulty) {
-    case Difficulty::kSimple:
-      return "Simple";
-    case Difficulty::kEasy:
-      return "Easy";
-    case Difficulty::kMild:
-      return "Mild";
-    case Difficulty::kModerate:
-      return "Moderate";
-    case Difficulty::kHard:
-      return "Hard";
-    case Difficulty::kVeryHard:
-      return "Very Hard";
-    case Difficulty::kFiendish:
-      return "Fiendish";
-    case Difficulty::kDiabolical:
-      return "Diabolical";
-  }
-  return "Unknown";
-}
-
 void DrawTechniquePanel(const Hint& currentHint, float width) {
   struct TechniqueEntry {
     const char* name;

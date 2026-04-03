@@ -56,9 +56,6 @@ struct PuzzleScore {
 
 int GetTechniqueScore(SolvingTechnique technique);
 
-// Utility for working with hint cells.
-bool ContainsCell(const std::vector<HintCell>& cells, int row, int col);
-
 // Returns the next supported hint in difficulty order.
 Hint GenerateHint(const Grid& grid);
 // Applies the technique named in hint.techniqueName; returns number of changes.

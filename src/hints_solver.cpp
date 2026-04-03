@@ -54,15 +54,6 @@ Hint MakeHint(const char* techniqueName,
 
 }  // namespace
 
-bool ContainsCell(const std::vector<HintCell>& cells, int row, int col) {
-  for (const HintCell& cell : cells) {
-    if (cell.row == row && cell.col == col) {
-      return true;
-    }
-  }
-  return false;
-}
-
 bool SharesUnit(int r1, int c1, int r2, int c2) {
   if (r1 == r2 || c1 == c2) {
     return true;

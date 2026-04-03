@@ -1,7 +1,5 @@
 #include "snapshot_io.h"
 
-#include "ui_helpers.h"
-
 #include <algorithm>
 #include <sstream>
 #include <string>
@@ -171,24 +169,6 @@ std::string SerializeSnapshot(const Grid& grid,
   return snapshot.str();
 }
 
-static Difficulty ParseDifficulty(const std::string& s) {
-  if (s == "Simple") return Difficulty::kSimple;
-  if (s == "Easy") return Difficulty::kEasy;
-  if (s == "Mild") return Difficulty::kMild;
-  if (s == "Moderate") return Difficulty::kModerate;
-  if (s == "Hard") return Difficulty::kHard;
-  if (s == "Very Hard") return Difficulty::kVeryHard;
-  if (s == "Fiendish") return Difficulty::kFiendish;
-  if (s == "Diabolical") return Difficulty::kDiabolical;
-  return Difficulty::kHard;
-}
-
-static InputMode ParseMode(const std::string& s) {
-  if (s == "Pencil") return InputMode::kPencil;
-  if (s == "Color") return InputMode::kColor;
-  return InputMode::kDigit;
-}
-
 SnapshotLoadResult DeserializeSnapshot(const std::string& text) {
   SnapshotLoadResult result;
 
@@ -209,8 +189,9 @@ SnapshotLoadResult DeserializeSnapshot(const std::string& text) {
     return result;
   }
 
-  Grid grid{};
-  Hint hint;
+  try {
+    Grid grid{};
+    Hint hint;
 
   enum class Section { kNone, kGivens, kValues, kPencils, kColors, kHintCells, kConflicts };
   Section section = Section::kNone;
@@ -249,13 +230,17 @@ SnapshotLoadResult DeserializeSnapshot(const std::string& text) {
       const std::string value = line.substr(eqPos + 1);
 
       if (key == "difficulty") {
-        result.difficulty = ParseDifficulty(value);
+        result.difficulty = ParseDifficulty(value.c_str());
       } else if (key == "mode") {
-        result.mode = ParseMode(value);
+        result.mode = ParseMode(value.c_str());
       } else if (key == "selected_row") {
         result.selectedRow = std::max(0, std::stoi(value) - 1);
       } else if (key == "selected_col") {
         result.selectedCol = std::max(0, std::stoi(value) - 1);
+      } else if (key == "highlight_pairs") {
+        result.highlightPairs = (std::stoi(value) != 0);
+      } else if (key == "wrong_entry_slash") {
+        result.showWrongEntrySlash = (std::stoi(value) != 0);
       } else if (key == "hint_name") {
         hint.techniqueName = (value == "none") ? "" : value;
       } else if (key == "hint_phase") {
@@ -378,10 +363,14 @@ SnapshotLoadResult DeserializeSnapshot(const std::string& text) {
     }
   }
 
-  result.grid = grid;
-  result.givens = givensPuzzle;
-  result.hint = hint;
-  result.ok = true;
+    result.grid = grid;
+    result.givens = givensPuzzle;
+    result.hint = hint;
+    result.ok = true;
+  } catch (const std::exception& e) {
+    result.ok = false;
+    result.errorMessage = std::string("Parse error: ") + e.what();
+  }
   return result;
 }
 }  // namespace sudoku

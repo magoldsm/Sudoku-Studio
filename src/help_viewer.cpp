@@ -25,20 +25,27 @@ bool HelpViewer::LoadHelpContent(const std::string& helpFilePath) {
 std::string HelpViewer::MarkdownToText(const std::string& markdown) {
   std::string text = markdown;
 
+  // Static regex patterns compiled once
+  static const std::regex headerPattern(R"(^#+\s+)");
+  static const std::regex boldPattern(R"(\*\*([^*]+)\*\*)");
+  static const std::regex italicPattern(R"(\*([^*]+)\*)");
+  static const std::regex linkPattern(R"(\[([^\]]+)\]\([^\)]+\))");
+  static const std::regex hrPattern(R"(^-{3,}$)");
+
   // Remove markdown headers (##, ###, etc.)
-  text = std::regex_replace(text, std::regex(R"(^#+\s+)"), "");
+  text = std::regex_replace(text, headerPattern, "");
 
   // Remove markdown bold (**text**)
-  text = std::regex_replace(text, std::regex(R"(\*\*([^*]+)\*\*)"), "$1");
+  text = std::regex_replace(text, boldPattern, "$1");
 
   // Remove markdown italic (*text*)
-  text = std::regex_replace(text, std::regex(R"(\*([^*]+)\*)"), "$1");
+  text = std::regex_replace(text, italicPattern, "$1");
 
   // Remove markdown links [text](url)
-  text = std::regex_replace(text, std::regex(R"(\[([^\]]+)\]\([^\)]+\))"), "$1");
+  text = std::regex_replace(text, linkPattern, "$1");
 
   // Remove horizontal rules (---)
-  text = std::regex_replace(text, std::regex(R"(^-{3,}$)"), "");
+  text = std::regex_replace(text, hrPattern, "");
 
   return text;
 }

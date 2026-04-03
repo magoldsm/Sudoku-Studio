@@ -26,7 +26,7 @@ CandidateGrid BuildFullCandidateGrid(const Grid& grid);
 // Builds all 27 units: 9 rows, 9 columns, 9 boxes
 std::vector<UnitCells> BuildAllUnits();
 
-// Forward declare ContainsCell from hints_solver.cpp
+// Check if a cell is in the given list
 bool ContainsCell(const std::vector<HintCell>& cells, int row, int col);
 
 // Utility: add cell to vector if not already present

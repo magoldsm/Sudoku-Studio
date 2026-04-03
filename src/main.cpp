@@ -1383,13 +1383,7 @@ int RunHintStressTest(int durationSeconds) {
     }
 
     // Initialize grid from puzzle values
-    Grid grid;
-    for (int r = 0; r < kGridSize; ++r) {
-      for (int c = 0; c < kGridSize; ++c) {
-        grid[r][c].value = puzzle[r][c];
-        grid[r][c].fixed = (puzzle[r][c] != 0);
-      }
-    }
+    Grid grid = BuildGrid(puzzle);
 
     // Use ApplyAutoPencil to properly initialize candidates (same as UI)
     ApplyAutoPencil(grid);
@@ -2234,6 +2228,8 @@ int main(int argc, char** argv) {
           uiState.mode = loaded.mode;
           uiState.selectedRow = std::clamp(loaded.selectedRow, 0, 8);
           uiState.selectedCol = std::clamp(loaded.selectedCol, 0, 8);
+          uiState.highlightPairs = loaded.highlightPairs;
+          uiState.showWrongEntrySlash = loaded.showWrongEntrySlash;
           ClearHint(uiState);  // Clear hint; it may be stale if pencil marks changed
           uiState.loadErrorMessage.clear();
           memset(uiState.loadInputBuf, 0, uiState.kLoadInputBufSize);

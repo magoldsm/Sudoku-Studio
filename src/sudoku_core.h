@@ -33,6 +33,13 @@ enum class Difficulty {
   kDiabolical,
 };
 
+// Convert InputMode and Difficulty enums to display strings
+const char* ModeName(InputMode mode);
+const char* DifficultyName(Difficulty difficulty);
+// Parse string representations back to enums
+InputMode ParseMode(const char* modeStr);
+Difficulty ParseDifficulty(const char* diffStr);
+
 struct Cell {
   int value = 0;
   std::bitset<9> pencil;
@@ -45,6 +52,10 @@ using Grid = std::array<std::array<Cell, kGridSize>, kGridSize>;
 struct HintCell {
   int row = -1;
   int col = -1;
+
+  bool operator==(const HintCell& other) const {
+    return row == other.row && col == other.col;
+  }
 };
 
 struct Hint {

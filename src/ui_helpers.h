@@ -8,8 +8,6 @@ namespace sudoku {
 // Returns digit 1..9 when a number key is pressed, or 0 for no digit input.
 int ReadDigitPress();
 bool IsClearPressed();
-const char* ModeName(InputMode mode);
-const char* DifficultyName(Difficulty difficulty);
 // Renders ordered technique list and highlights the active hint technique.
 // If width > 0, uses that width; otherwise uses full available width.
 void DrawTechniquePanel(const Hint& currentHint, float width = 0.0f);

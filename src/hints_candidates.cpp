@@ -87,6 +87,14 @@ void AddUniqueCell(std::vector<HintCell>& cells, int row, int col) {
     cells.push_back({row, col});
   }
 }
+bool ContainsCell(const std::vector<HintCell>& cells, int row, int col) {
+  for (const HintCell& cell : cells) {
+    if (cell.row == row && cell.col == col) {
+      return true;
+    }
+  }
+  return false;
+}
 
 bool SeesBoth(const HintCell& target, const HintCell& left, const HintCell& right) {
   return SharesUnit(target.row, target.col, left.row, left.col) &&

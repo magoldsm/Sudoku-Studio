@@ -14,6 +14,8 @@ struct SnapshotLoadResult {
   int selectedRow = 0;
   int selectedCol = 0;
   Hint hint;
+  bool highlightPairs = false;
+  bool showWrongEntrySlash = false;
 };
 
 // Serializes full board/session state in sudoku-studio-v1 text format.
