@@ -64,6 +64,8 @@ int ApplyHint(Grid& grid, const Hint& hint);
 int ApplyAutoPencil(Grid& grid);
 // Checks if user's pencil marks differ from legal candidates; reports mismatch if found.
 bool HasStaleOrIncorrectPencilMarks(const Grid& grid);
+// Computes missing legal candidates for a specific cell (what user erased that's still legal)
+std::vector<int> GetMissingCandidates(const Grid& grid, int row, int col);
 // Applies one pass of placements; returns number of placed values.
 int ApplyNakedSingles(Grid& grid);
 int ApplyHiddenSingles(Grid& grid);

@@ -755,6 +755,7 @@ inline void ClearHint(UIState& uiState) {
   uiState.currentHint.chainEndpoints.clear();
   uiState.currentHint.chainCells.clear();
   uiState.currentHint.revealPhase = 0;
+  uiState.hintMissingCandidates.clear();
   uiState.statusMessage.clear();
   uiState.statusFrames = 0;
 }
@@ -961,6 +962,35 @@ void DrawBoard(UIState& uiState,
                       notePos,
                       noteColor,
                       text.c_str());
+      }
+
+      // --- RENDER MISSING CANDIDATES (orange, for hint-affected cells) ---
+      for (const MissingCandidate& mc : uiState.hintMissingCandidates) {
+        if (mc.row == r && mc.col == c) {
+          // This cell has missing candidates for the current hint
+          for (int d : mc.missingDigits) {
+            const int slotR = (d - 1) / 3;
+            const int slotC = (d - 1) % 3;
+            const std::string text = std::to_string(d);
+            const ImVec2 notePos(cellMin.x + kPencilMarkStartX + slotC * kPencilMarkSpacingX,
+                                 cellMin.y + kPencilMarkStartY + slotR * kPencilMarkSpacingY);
+            const ImVec2 noteSize =
+                noteFont->CalcTextSizeA(noteFont->FontSize, FLT_MAX, 0.0f, text.c_str());
+
+            // Draw bright orange rectangle background
+            draw->AddRectFilled(ImVec2(notePos.x - 2.0f, notePos.y - 1.0f),
+                                ImVec2(notePos.x + noteSize.x + 2.0f, notePos.y + noteSize.y + 1.0f),
+                                kMissingCandidateColor, kPencilMarkBorderRadius);
+
+            // Draw orange text
+            draw->AddText(noteFont,
+                          noteFont->FontSize,
+                          notePos,
+                          IM_COL32(0, 0, 0, 255),  // black text on orange background
+                          text.c_str());
+          }
+          break;
+        }
       }
     }
   }
@@ -1525,6 +1555,16 @@ int main(int argc, char** argv) {
       if (uiState.currentHint.revealPhase == 0 || uiState.currentHint.revealPhase >= 3) {
         uiState.currentHint = GenerateHint(puzzleState.grid);
         uiState.currentHint.revealPhase = 1;
+
+        // Compute missing candidates for hint-affected cells
+        uiState.hintMissingCandidates.clear();
+        for (const HintCell& cell : uiState.currentHint.affectedCells) {
+          const std::vector<int> missing = GetMissingCandidates(puzzleState.grid, cell.row, cell.col);
+          if (!missing.empty()) {
+            uiState.hintMissingCandidates.push_back({cell.row, cell.col, missing});
+          }
+        }
+
         uiState.statusMessage = "Hint: " + uiState.currentHint.techniqueName;
         if (HasStaleOrIncorrectPencilMarks(puzzleState.grid)) {
           uiState.statusMessage += " (pencil marks need refresh—try Auto Pencil)";

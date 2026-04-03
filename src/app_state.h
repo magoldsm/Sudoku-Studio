@@ -7,6 +7,13 @@
 
 namespace sudoku {
 
+// Missing candidate for hint-affected cells
+struct MissingCandidate {
+  int row = -1;
+  int col = -1;
+  std::vector<int> missingDigits;  // Digits 1-9 that are legal but not in user's pencil marks
+};
+
 // Application puzzle and grid state.
 struct PuzzleState {
   Puzzle puzzle;
@@ -37,6 +44,7 @@ struct UIState {
   // Hint state
   Hint currentHint;
   int hintPhaseCounter = 0;
+  std::vector<MissingCandidate> hintMissingCandidates;  // Pencil marks missing from hint-affected cells
 
   // Status messages
   std::string statusMessage;

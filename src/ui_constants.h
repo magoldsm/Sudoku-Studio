@@ -21,6 +21,7 @@ constexpr ImU32 kChainAlternateColorA = IM_COL32(138, 210, 255, 220);
 constexpr ImU32 kChainAlternateColorB = IM_COL32(166, 235, 196, 220);
 constexpr ImU32 kHintDigitHighlightColor = IM_COL32(255, 140, 0, 255);
 constexpr ImU32 kChainEndpointBorderColor = IM_COL32(30, 100, 210, 255);
+constexpr ImU32 kMissingCandidateColor = IM_COL32(255, 165, 0, 255);  // bright orange for missing pencil marks
 
 // Grid lines
 constexpr ImU32 kGridThickLineColor = IM_COL32(52, 44, 33, 255);

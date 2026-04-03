@@ -1475,6 +1475,26 @@ bool HasStaleOrIncorrectPencilMarks(const Grid& grid) {
   return false;  // All pencil marks are consistent
 }
 
+std::vector<int> GetMissingCandidates(const Grid& grid, int row, int col) {
+  const Cell& cell = grid[row][col];
+  std::vector<int> missing;
+
+  if (cell.value != 0) {
+    return missing;  // Cell is solved, no missing candidates
+  }
+
+  const std::bitset<9> legalCandidates = ComputeCandidates(grid, row, col);
+
+  // Find digits that are legal but not in user's pencil marks
+  for (int d = 0; d < 9; ++d) {
+    if (legalCandidates.test(d) && !cell.pencil.test(d)) {
+      missing.push_back(d + 1);  // Convert 0-indexed to 1-9
+    }
+  }
+
+  return missing;
+}
+
 int ApplyNakedSingles(Grid& grid) {
   int placements = 0;
   for (int row = 0; row < kGridSize; ++row) {
