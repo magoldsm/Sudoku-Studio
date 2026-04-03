@@ -1085,6 +1085,7 @@ Hint DetectXYChain(const CandidateGrid& candidates) {
                 }
                 if (SharesUnit(row, col, startCell.row, startCell.col) &&
                     SharesUnit(row, col, nextCell.row, nextCell.col)) {
+                  std::cerr << "DEBUG XY-Chain: Adding elimination target r" << (row+1) << "c" << (col+1) << " digit " << (heldDigit+1) << std::endl;
                   AddUniqueCell(affected, row, col);
                   hasElimination = true;
                 }
@@ -1092,8 +1093,11 @@ Hint DetectXYChain(const CandidateGrid& candidates) {
             }
 
             if (hasElimination) {
+              std::cerr << "DEBUG XY-Chain: Found chain with " << affected.size() << " affected cells" << std::endl;
               return MakeHint("XY-Chain", affected, {heldDigit + 1}, {startCell, nextCell},
                               chainCells);
+            } else {
+              std::cerr << "DEBUG XY-Chain: Chain found but no elimination targets" << std::endl;
             }
           } else {
             // Chain not yet closed — extend it.
@@ -2737,6 +2741,18 @@ int ApplyHint(Grid& grid, const Hint& hint) {
 Hint GenerateHint(const Grid& grid) {
   // Use user's pencil marks as source of truth; respect their eliminations
   const CandidateGrid candidates = BuildCandidateGrid(grid);
+
+  // DEBUG: check r6c4 candidate state
+  std::cerr << "DEBUG: r6c4 (grid[5][3]) candidates: ";
+  for (int d = 0; d < 9; ++d) {
+    if (candidates[5][3].test(d)) std::cerr << (d+1) << " ";
+  }
+  std::cerr << std::endl;
+  std::cerr << "DEBUG: r6c4 pencil marks: ";
+  for (int d = 0; d < 9; ++d) {
+    if (grid[5][3].pencil.test(d)) std::cerr << (d+1) << " ";
+  }
+  std::cerr << std::endl;
 
   // Helper: returns the hint only if it would actually change the pencil state.
   // Detectors use full legal candidates; pencil marks may have already captured

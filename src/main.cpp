@@ -1569,12 +1569,36 @@ int main(int argc, char** argv) {
         uiState.currentHint = GenerateHint(puzzleState.grid);
         uiState.currentHint.revealPhase = 1;
 
-        // Compute missing candidates for hint-affected cells
+        // DEBUG: Log the hint that was generated
+        std::cerr << "DEBUG MAIN: Generated hint: " << uiState.currentHint.techniqueName;
+        if (!uiState.currentHint.involvedDigits.empty()) {
+          std::cerr << " digits: ";
+          for (int d : uiState.currentHint.involvedDigits) std::cerr << d << " ";
+        }
+        std::cerr << " affected cells: ";
+        for (const HintCell& hc : uiState.currentHint.affectedCells) {
+          std::cerr << "r" << (hc.row+1) << "c" << (hc.col+1) << " ";
+        }
+        std::cerr << std::endl;
+
+        // Compute missing candidates for hint-affected cells (only those relevant to the hint)
         uiState.hintMissingCandidates.clear();
         for (const HintCell& cell : uiState.currentHint.affectedCells) {
           const std::vector<int> missing = GetMissingCandidates(puzzleState.grid, cell.row, cell.col);
-          if (!missing.empty()) {
-            uiState.hintMissingCandidates.push_back({cell.row, cell.col, missing});
+          // Filter: only keep missing candidates that are involved in this hint
+          std::vector<int> relevantMissing;
+          for (int d : missing) {
+            if (std::find(uiState.currentHint.involvedDigits.begin(),
+                          uiState.currentHint.involvedDigits.end(), d) !=
+                uiState.currentHint.involvedDigits.end()) {
+              relevantMissing.push_back(d);
+            }
+          }
+          if (!relevantMissing.empty()) {
+            std::cerr << "DEBUG MAIN: r" << (cell.row+1) << "c" << (cell.col+1) << " missing (relevant): ";
+            for (int d : relevantMissing) std::cerr << d << " ";
+            std::cerr << std::endl;
+            uiState.hintMissingCandidates.push_back({cell.row, cell.col, relevantMissing});
           }
         }
 
