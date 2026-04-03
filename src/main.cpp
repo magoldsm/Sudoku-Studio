@@ -756,7 +756,6 @@ inline void ClearHint(UIState& uiState) {
   uiState.currentHint.chainCells.clear();
   uiState.currentHint.revealPhase = 0;
   uiState.hintMissingCandidates.clear();
-  uiState.hasStalePencilMarksWarning = false;
   uiState.statusMessage.clear();
   uiState.statusFrames = 0;
 }
@@ -1555,7 +1554,6 @@ int main(int argc, char** argv) {
     if (requestAutoPencil) {
       ApplySolverAction(uiState, puzzleState, [](Grid& g) { return ApplyAutoPencil(g); },
                         "Auto-pencil updated ", " cells", "No pencil changes", 240);
-      uiState.hasStalePencilMarksWarning = false;  // Clear warning after refresh
     }
     if (requestSolveNakedSingles) {
       ApplySolverAction(uiState, puzzleState, [](Grid& g) { return AutoSolveNakedSingles(g); },
@@ -1579,9 +1577,6 @@ int main(int argc, char** argv) {
             uiState.hintMissingCandidates.push_back({cell.row, cell.col, missing});
           }
         }
-
-        // Set persistent warning flag if pencil marks are stale
-        uiState.hasStalePencilMarksWarning = HasStaleOrIncorrectPencilMarks(puzzleState.grid);
 
         // Check if this is a validation warning (no solving hint found)
         if (!uiState.currentHint.validation.erasedButLegal.empty()) {
@@ -1737,12 +1732,6 @@ int main(int argc, char** argv) {
                          uiState.currentHint.revealPhase >= 3 ? " (digits highlighted)" : "");
     } else {
       ImGui::TextUnformatted("Hints active: unit, same digit, and matching pencil-mark highlight");
-    }
-
-    // Persistent warning: stale pencil marks
-    if (uiState.hasStalePencilMarksWarning) {
-      ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f),
-                         "Erroneous or missing pencil marks.  Try Auto Pencil to correct.");
     }
 
     // Validation warning: erased-but-legal candidates (Stage 1 + Stage 2)

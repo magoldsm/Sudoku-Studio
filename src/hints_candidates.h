@@ -20,7 +20,7 @@ struct UnitCells {
 CandidateGrid BuildCandidateGrid(const Grid& grid);
 
 // Builds a candidate grid with full legal candidates, ignoring pencil marks
-// Used by GenerateHint to find hints that pencil marks might hide
+// (Deprecated: GenerateHint now respects pencil marks as source of truth)
 CandidateGrid BuildFullCandidateGrid(const Grid& grid);
 
 // Builds all 27 units: 9 rows, 9 columns, 9 boxes

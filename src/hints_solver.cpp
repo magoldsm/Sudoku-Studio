@@ -2751,7 +2751,8 @@ int ApplyHint(Grid& grid, const Hint& hint) {
 }
 
 Hint GenerateHint(const Grid& grid) {
-  const CandidateGrid candidates = BuildFullCandidateGrid(grid);
+  // Use user's pencil marks as source of truth; respect their eliminations
+  const CandidateGrid candidates = BuildCandidateGrid(grid);
 
   // Helper: returns the hint only if it would actually change the pencil state.
   // Detectors use full legal candidates; pencil marks may have already captured
