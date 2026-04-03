@@ -1812,29 +1812,6 @@ int main(int argc, char** argv) {
       puzzleState.hasSolution = ComputeSolutionFromGivens(puzzleState.givens, puzzleState.solution);
       puzzleState.score = SolveAndScoreDetailed(puzzleState.puzzle);
 
-      // Debug output
-      std::cerr << "Generated puzzle score: " << puzzleState.score.totalScore << std::endl;
-      std::cerr << "  Naked Singles: " << puzzleState.score.nakedSingles << std::endl;
-      std::cerr << "  Hidden Singles: " << puzzleState.score.hiddenSingles << std::endl;
-      std::cerr << "  Pointing Pairs: " << puzzleState.score.pointingPairs << std::endl;
-      std::cerr << "  Box/Line: " << puzzleState.score.boxLineReductions << std::endl;
-      std::cerr << "  Naked Pairs: " << puzzleState.score.nakedPairs << std::endl;
-      std::cerr << "  Hidden Pairs: " << puzzleState.score.hiddenPairs << std::endl;
-      std::cerr << "  Naked Triples: " << puzzleState.score.nakedTriples << std::endl;
-      std::cerr << "  Hidden Triples: " << puzzleState.score.hiddenTriples << std::endl;
-      std::cerr << "  Naked Quads: " << puzzleState.score.nakedQuads << std::endl;
-      std::cerr << "  Hidden Quads: " << puzzleState.score.hiddenQuads << std::endl;
-      std::cerr << "  Block/Block: " << puzzleState.score.blockBlockInteractions << std::endl;
-      std::cerr << "  X-Wing: " << puzzleState.score.xWings << std::endl;
-      std::cerr << "  Unique Rectangle: " << puzzleState.score.uniqueRectangles << std::endl;
-      std::cerr << "  Y-Wing: " << puzzleState.score.yWings << std::endl;
-      std::cerr << "  Simple Colouring: " << puzzleState.score.simpleColourings << std::endl;
-      std::cerr << "  Swordfish: " << puzzleState.score.swordfishes << std::endl;
-      std::cerr << "  XYZ-Wing: " << puzzleState.score.xyzWings << std::endl;
-      std::cerr << "  XY-Chain: " << puzzleState.score.xyChains << std::endl;
-      std::cerr << "  Jellyfish: " << puzzleState.score.jellyfishes << std::endl;
-      std::cerr << "  Forcing Chains: " << puzzleState.score.forcingChains << std::endl;
-
       uiState.undoHistory.clear();
       uiState.currentHint = {};
       uiState.selectedRow = 0;
