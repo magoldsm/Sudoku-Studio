@@ -7,7 +7,8 @@ It combines a puzzle workspace, interactive solving tools, and an advanced hint 
 
 - **Generator and Solver Synchronized**: All 20 solving techniques use identical algorithms across generation, scoring, and solving pipelines. Generator validates 100% of puzzles are completely solvable before acceptance.
 - **Complete Technique Coverage**: 20 deterministic solving techniques implemented and tested across all difficulty bands (Simple → Diabolical).
-- Multi-file refactor complete with explicit headers and source modules.
+- **Phase 1 Refactoring Complete**: Header/coupling cleanup, enum converters centralized, duplicate declarations removed.
+- **Phase 2 Refactoring Complete**: main.cpp simplified (~150 lines removed), solver actions consolidated, difficulty bands centralized, UI rendering data-driven, test utilities extracted.
 - Snapshot save/load format is versioned (`sudoku-studio-v1`).
 - Two validation modes: `--self-check` (hint detector consistency) and `--test-generation` (generator/solver synchronization).
 
@@ -251,13 +252,15 @@ Given clues are immutable.
 
 ## Project Layout
 
-- `src/sudoku_core.h`: shared data types (Grid, Cell, Puzzle, Hint, Difficulty) and core grid/puzzle helpers.
+- `src/sudoku_core.h` / `src/sudoku_core.cpp`: shared data types (Grid, Cell, Puzzle, Hint, Difficulty), core grid/puzzle helpers, enum converters, and difficulty band definitions.
 - `src/hints_solver.h` / `src/hints_solver.cpp`: 20 solving technique detectors and appliers, puzzle scoring, comprehensive solver, and validation.
+- `src/hints_candidates.h` / `src/hints_candidates.cpp`: candidate grid management and cell collection utilities.
 - `src/ui_helpers.h` / `src/ui_helpers.cpp`: input handling, mode management, and UI rendering (technique panel, score display).
 - `src/ui_constants.h`: UI layout constants (cell size, padding, colors, fonts).
 - `src/app_state.h`: UI state management (selected cell, active hint, undo stack, mode).
 - `src/snapshot_io.h` / `src/snapshot_io.cpp`: snapshot serialization/deserialization (versioned format with givens, values, pencils, colors, hints).
-- `src/main.cpp`: ImGui application entry point, event loop, puzzle generation, and main workflow.
+- `src/solver_test.h` / `src/solver_test.cpp`: solver test utilities (SolveWithLogging, TestGenerationAndSolving, RunHintStressTest, CountUnsolvedCells).
+- `src/main.cpp`: ImGui application entry point, event loop, puzzle generation, hint pipeline, and main workflow.
 
 ## Dependencies
 
