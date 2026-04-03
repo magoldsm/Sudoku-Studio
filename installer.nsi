@@ -3,10 +3,15 @@
 
 !include "MUI2.nsh"
 
+; 64-bit installer
+!ifdef NSIS_WIN32_MAKENSIS
+  !define NSIS_64BIT
+!endif
+
 ; Name and file
 Name "Sudoku Studio"
 OutFile "SudokuStudio-Installer.exe"
-InstallDir "$PROGRAMFILES\Sudoku Studio"
+InstallDir "$PROGRAMFILES64\Sudoku Studio"
 InstallDirRegKey HKLM "Software\Sudoku Studio" "Install_Dir"
 
 ; Request application privileges
