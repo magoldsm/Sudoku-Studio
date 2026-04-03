@@ -45,6 +45,7 @@ struct UIState {
   Hint currentHint;
   int hintPhaseCounter = 0;
   std::vector<MissingCandidate> hintMissingCandidates;  // Pencil marks missing from hint-affected cells
+  bool hasStalePencilMarksWarning = false;  // Persistent warning while hint is active
 
   // Status messages
   std::string statusMessage;
