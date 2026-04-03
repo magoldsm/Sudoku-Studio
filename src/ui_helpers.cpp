@@ -197,10 +197,10 @@ void DrawColorTagPanel(Grid& grid,
       draw->AddCircle(buttonCenter, circleRadius + 2.5f, darkGreen, 16, 1.5f);
     }
 
-    ImGui::SameLine(100);
+    ImGui::SameLine(70);
 
-    // --- SHOW EFFECT BUTTON (digit with overstrike slash) ---
-    // Check if all 9 of this digit are placed (disable button if so)
+    // --- COUNTDOWN (remaining count for this digit) ---
+    // Count how many of this digit are already placed
     int digitCount = 0;
     for (int r = 0; r < kGridSize; ++r) {
       for (int c = 0; c < kGridSize; ++c) {
@@ -209,7 +209,29 @@ void DrawColorTagPanel(Grid& grid,
         }
       }
     }
-    const bool allDigitsPlaced = (digitCount == 9);
+    const int remaining = 9 - digitCount;
+    const bool allDigitsPlaced = (remaining == 0);
+
+    // Display remaining count
+    const std::string remainingStr = std::to_string(remaining);
+    const ImVec2 countdownPos = ImGui::GetCursorScreenPos();
+    const ImVec2 countdownCenter(countdownPos.x + 12, countdownPos.y + digitButtonHeight * 0.5f);
+
+    // Invisible button to consume space and advance cursor
+    ImGui::InvisibleButton(("remaining" + std::to_string(digit)).c_str(), ImVec2(24, digitButtonHeight));
+
+    ImFont* countdownFont = ImGui::GetFont();
+    const ImVec2 countdownTextSize = countdownFont->CalcTextSizeA(countdownFont->FontSize * 0.9f, FLT_MAX, 0, remainingStr.c_str());
+    const ImVec2 countdownTextPos(countdownCenter.x - countdownTextSize.x * 0.5f,
+                                   countdownCenter.y - countdownTextSize.y * 0.5f);
+
+    // Draw countdown text (gray if complete, lighter gray normally)
+    const ImU32 countdownColor = allDigitsPlaced ? IM_COL32(200, 200, 200, 255) : IM_COL32(100, 100, 100, 255);
+    draw->AddText(countdownFont, countdownFont->FontSize * 0.9f, countdownTextPos, countdownColor, remainingStr.c_str());
+
+    ImGui::SameLine(130);
+
+    // --- SHOW EFFECT BUTTON (digit with overstrike slash) ---
 
     const ImVec2 effectButtonPos = ImGui::GetCursorScreenPos();
     const ImVec2 effectButtonCenter(effectButtonPos.x + digitButtonWidth * 0.5f,

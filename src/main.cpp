@@ -802,7 +802,9 @@ void DrawBoard(Grid& grid,
                bool hasSolution,
                std::vector<Grid>& undoHistory,
                bool solved,
-               const Hint& hint,
+               Hint& hint,
+               std::string& statusMessage,
+               int& statusFrames,
                ImFont* digitFont,
                ImFont* noteFont,
                int& showPositionDigit,
@@ -846,12 +848,30 @@ void DrawBoard(Grid& grid,
         if (clickedCell.colorTag != 0) {
           PushUndoState(undoHistory, grid);
           clickedCell.colorTag = 0;
+          // Clear hint when color is modified via mouse click
+          hint.techniqueName.clear();
+          hint.affectedCells.clear();
+          hint.involvedDigits.clear();
+          hint.chainEndpoints.clear();
+          hint.chainCells.clear();
+          hint.revealPhase = 0;
+          statusMessage.clear();
+          statusFrames = 0;
         }
       } else {
         // Single-click: apply color (don't select the cell)
         if (clickedCell.colorTag != activeColor) {
           PushUndoState(undoHistory, grid);
           clickedCell.colorTag = activeColor;
+          // Clear hint when color is modified via mouse click
+          hint.techniqueName.clear();
+          hint.affectedCells.clear();
+          hint.involvedDigits.clear();
+          hint.chainEndpoints.clear();
+          hint.chainCells.clear();
+          hint.revealPhase = 0;
+          statusMessage.clear();
+          statusFrames = 0;
         }
       }
       // Don't select the cell in color mode
@@ -870,6 +890,15 @@ void DrawBoard(Grid& grid,
         if (clickedCell.pencil.test(markDigit - 1)) {
           PushUndoState(undoHistory, grid);
           clickedCell.pencil.reset(markDigit - 1);
+          // Clear hint when pencil mark is modified via mouse click
+          hint.techniqueName.clear();
+          hint.affectedCells.clear();
+          hint.involvedDigits.clear();
+          hint.chainEndpoints.clear();
+          hint.chainCells.clear();
+          hint.revealPhase = 0;
+          statusMessage.clear();
+          statusFrames = 0;
         }
       }
     }
@@ -1476,6 +1505,18 @@ int RunHintStressTest(int durationSeconds) {
   return errors > 0 ? 1 : 0;
 }
 
+// Helper function to completely clear the current hint state
+inline void ClearHint(UIState& uiState) {
+  uiState.currentHint.techniqueName.clear();
+  uiState.currentHint.affectedCells.clear();
+  uiState.currentHint.involvedDigits.clear();
+  uiState.currentHint.chainEndpoints.clear();
+  uiState.currentHint.chainCells.clear();
+  uiState.currentHint.revealPhase = 0;
+  uiState.statusMessage.clear();
+  uiState.statusFrames = 0;
+}
+
 int main(int argc, char** argv) {
   if (argc > 1 && std::string(argv[1]) == "--self-check") {
     return RunHintSelfChecks();
@@ -1906,7 +1947,7 @@ int main(int argc, char** argv) {
       puzzleState.score = SolveAndScoreDetailed(puzzleState.puzzle);
 
       uiState.undoHistory.clear();
-      uiState.currentHint = {};
+      ClearHint(uiState);
       uiState.selectedRow = 0;
       uiState.selectedCol = 0;
       uiState.statusMessage = std::string("Generated new ") + DifficultyName(uiState.selectedDifficulty) + " puzzle";
@@ -1921,7 +1962,7 @@ int main(int argc, char** argv) {
       uiState.statusFrames = 200;
     }
     if (requestUndo) {
-      uiState.currentHint = {};
+      ClearHint(uiState);
       if (UndoLastChange(puzzleState.grid, uiState.undoHistory)) {
         uiState.statusMessage = "Undid last change";
       } else {
@@ -1933,7 +1974,7 @@ int main(int argc, char** argv) {
       uiState.mode = InputMode::kDigit;  // Exit color mode
       const Grid previous = puzzleState.grid;
       const int changed = ApplyAutoPencil(puzzleState.grid);
-      uiState.currentHint = {};
+      ClearHint(uiState);
       if (changed > 0) {
         PushUndoState(uiState.undoHistory, previous);
       }
@@ -1944,7 +1985,7 @@ int main(int argc, char** argv) {
       uiState.mode = InputMode::kDigit;  // Exit color mode
       const Grid previous = puzzleState.grid;
       const int placed = AutoSolveNakedSingles(puzzleState.grid);
-      uiState.currentHint = {};
+      ClearHint(uiState);
       if (placed > 0) {
         PushUndoState(uiState.undoHistory, previous);
       }
@@ -1959,7 +2000,7 @@ int main(int argc, char** argv) {
       uiState.mode = InputMode::kDigit;  // Exit color mode
       const Grid previous = puzzleState.grid;
       const int placed = AutoSolveHiddenSingles(puzzleState.grid);
-      uiState.currentHint = {};
+      ClearHint(uiState);
       if (placed > 0) {
         PushUndoState(uiState.undoHistory, previous);
       }
@@ -1994,7 +2035,7 @@ int main(int argc, char** argv) {
       ApplyHint(puzzleState.grid, uiState.currentHint);
       uiState.statusMessage = "Applied: " + name;
       uiState.statusFrames = 300;
-      uiState.currentHint = {};
+      ClearHint(uiState);
     }
 
     Cell& selected = puzzleState.grid[uiState.selectedRow][uiState.selectedCol];
@@ -2008,14 +2049,14 @@ int main(int argc, char** argv) {
           selected.value = digit;
           selected.pencil.reset();
           RemoveDigitFromPeerPencils(puzzleState.grid, uiState.selectedRow, uiState.selectedCol, digit);
-          uiState.currentHint = {};
+          ClearHint(uiState);
         }
       }
       if (IsClearPressed()) {
         if (selected.value != 0) {
           PushUndoState(uiState.undoHistory, puzzleState.grid);
           selected.value = 0;
-          uiState.currentHint = {};
+          ClearHint(uiState);
         }
       }
     }
@@ -2023,13 +2064,13 @@ int main(int argc, char** argv) {
       if (digit != 0 && selected.value == 0) {
         PushUndoState(uiState.undoHistory, puzzleState.grid);
         selected.pencil.flip(digit - 1);
-        uiState.currentHint = {};
+        ClearHint(uiState);
       }
       if (IsClearPressed()) {
         if (selected.pencil.any()) {
           PushUndoState(uiState.undoHistory, puzzleState.grid);
           selected.pencil.reset();
-          uiState.currentHint = {};
+          ClearHint(uiState);
         }
       }
     }
@@ -2045,13 +2086,13 @@ int main(int argc, char** argv) {
           if (selected.colorTag != 0) {
             PushUndoState(uiState.undoHistory, puzzleState.grid);
             selected.colorTag = 0;
-            uiState.currentHint = {};
+            ClearHint(uiState);
           }
         } else {
           // Apply the active color
           PushUndoState(uiState.undoHistory, puzzleState.grid);
           selected.colorTag = uiState.activeColor;
-          uiState.currentHint = {};
+          ClearHint(uiState);
         }
       }
       if (IsClearPressed()) {
@@ -2059,7 +2100,7 @@ int main(int argc, char** argv) {
         if (selected.colorTag != 0) {
           PushUndoState(uiState.undoHistory, puzzleState.grid);
           selected.colorTag = 0;
-          uiState.currentHint = {};
+          ClearHint(uiState);
         }
       }
     }
@@ -2093,7 +2134,8 @@ int main(int argc, char** argv) {
     DrawBoard(puzzleState.grid, uiState.selectedRow, uiState.selectedCol, highlightDigit, uiState.mode,
               uiState.activeColor, uiState.highlightPairs, uiState.showWrongEntrySlash,
               &puzzleState.solution, puzzleState.hasSolution, uiState.undoHistory, solved,
-              uiState.currentHint, digitFont, noteFont, uiState.showPositionDigit, uiState.showEffectDigit);
+              uiState.currentHint, uiState.statusMessage, uiState.statusFrames, digitFont, noteFont,
+              uiState.showPositionDigit, uiState.showEffectDigit);
 
     // Position Technique Panel to the right of Board/Color Tags (on same row)
     ImGui::SameLine(0.0f, kBoardPanelMargin);
@@ -2192,7 +2234,7 @@ int main(int argc, char** argv) {
           uiState.mode = loaded.mode;
           uiState.selectedRow = std::clamp(loaded.selectedRow, 0, 8);
           uiState.selectedCol = std::clamp(loaded.selectedCol, 0, 8);
-          uiState.currentHint = {};  // Clear hint; it may be stale if pencil marks changed
+          ClearHint(uiState);  // Clear hint; it may be stale if pencil marks changed
           uiState.loadErrorMessage.clear();
           memset(uiState.loadInputBuf, 0, uiState.kLoadInputBufSize);
           uiState.statusMessage = "Snapshot loaded";
