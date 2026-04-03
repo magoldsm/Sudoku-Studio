@@ -1723,8 +1723,8 @@ int main(int argc, char** argv) {
 
     // Persistent warning: stale pencil marks
     if (uiState.hasStalePencilMarksWarning) {
-      ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.0f, 1.0f),
-                         "⚠ Pencil marks incomplete — orange digits show missing candidates (try Auto Pencil)");
+      ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f),
+                         "Erroneous or missing pencil marks.  Try Auto Pencil to correct.");
     }
 
     if (uiState.openSnapshotPopup) {

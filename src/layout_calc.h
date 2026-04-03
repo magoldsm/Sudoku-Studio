@@ -73,8 +73,8 @@ constexpr float kWorkspaceContentWidth =
 // Title section: "Sudoku Studio - [Difficulty] Score: [Score]" + "Sharp text..." + spacing
 constexpr float kTitleSectionHeight = 3.0f * kTextLineHeight + kSectionSpacingV;
 
-// Control section: "Controls:" line, "Selected:" line, Status line + spacing
-constexpr float kControlSectionHeight = 3.0f * kTextLineHeight + 2.0f * kSectionSpacingV;
+// Control section: "Controls:" line, "Selected:" line, Status line, Warning line + spacing
+constexpr float kControlSectionHeight = 4.0f * kTextLineHeight + 2.0f * kSectionSpacingV;
 
 // Total workspace content height:
 constexpr float kWorkspaceContentHeight =
