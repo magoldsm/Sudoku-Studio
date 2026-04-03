@@ -1499,8 +1499,8 @@ ValidationWarning ValidateUserCandidates(const Grid& grid) {
 }
 
 int ApplyNakedSingles(Grid& grid) {
-  // Use user's pencil marks as source of truth (consistent with hint detection)
-  const CandidateGrid candidates = BuildCandidateGrid(grid);
+  // Use full legal candidates (for solver speed during generation)
+  // Hints use ApplyHintWithCandidates for pencil-mark-aware solving
   int placements = 0;
   for (int row = 0; row < kGridSize; ++row) {
     for (int col = 0; col < kGridSize; ++col) {
@@ -1509,12 +1509,13 @@ int ApplyNakedSingles(Grid& grid) {
         continue;
       }
 
-      if (candidates[row][col].count() != 1) {
+      const std::bitset<9> candidates = ComputeCandidates(grid, row, col);
+      if (candidates.count() != 1) {
         continue;
       }
 
       for (int digit = 1; digit <= 9; ++digit) {
-        if (candidates[row][col].test(digit - 1)) {
+        if (candidates.test(digit - 1)) {
           cell.value = digit;
           cell.pencil.reset();
           RemoveDigitFromPeerPencils(grid, row, col, digit);
@@ -1528,8 +1529,8 @@ int ApplyNakedSingles(Grid& grid) {
 }
 
 int ApplyHiddenSingles(Grid& grid) {
-  // Use user's pencil marks as source of truth (consistent with hint detection)
-  const CandidateGrid candidates = BuildCandidateGrid(grid);
+  // Use full legal candidates (for solver speed during generation)
+  // Hints use ApplyHintWithCandidates for pencil-mark-aware solving
   int placements = 0;
 
   for (int row = 0; row < kGridSize; ++row) {
@@ -1540,12 +1541,13 @@ int ApplyHiddenSingles(Grid& grid) {
         if (grid[row][col].value != 0) {
           continue;
         }
-        if (candidates[row][col].test(digit - 1)) {
+        const std::bitset<9> candidates = ComputeCandidates(grid, row, col);
+        if (candidates.test(digit - 1)) {
           ++count;
           matchCol = col;
         }
       }
-      if (count == 1 && grid[row][matchCol].value == 0) {
+      if (count == 1 && matchCol >= 0 && grid[row][matchCol].value == 0) {
         grid[row][matchCol].value = digit;
         grid[row][matchCol].pencil.reset();
         RemoveDigitFromPeerPencils(grid, row, matchCol, digit);
@@ -1562,12 +1564,13 @@ int ApplyHiddenSingles(Grid& grid) {
         if (grid[row][col].value != 0) {
           continue;
         }
-        if (candidates[row][col].test(digit - 1)) {
+        const std::bitset<9> candidates = ComputeCandidates(grid, row, col);
+        if (candidates.test(digit - 1)) {
           ++count;
           matchRow = row;
         }
       }
-      if (count == 1 && grid[matchRow][col].value == 0) {
+      if (count == 1 && matchRow >= 0 && grid[matchRow][col].value == 0) {
         grid[matchRow][col].value = digit;
         grid[matchRow][col].pencil.reset();
         RemoveDigitFromPeerPencils(grid, matchRow, col, digit);
@@ -1589,14 +1592,15 @@ int ApplyHiddenSingles(Grid& grid) {
             if (grid[row][col].value != 0) {
               continue;
             }
-            if (candidates[row][col].test(digit - 1)) {
+            const std::bitset<9> candidates = ComputeCandidates(grid, row, col);
+            if (candidates.test(digit - 1)) {
               ++count;
               foundRow = row;
               foundCol = col;
             }
           }
         }
-        if (count == 1 && grid[foundRow][foundCol].value == 0) {
+        if (count == 1 && foundRow >= 0 && foundCol >= 0 && grid[foundRow][foundCol].value == 0) {
           grid[foundRow][foundCol].value = digit;
           grid[foundRow][foundCol].pencil.reset();
           RemoveDigitFromPeerPencils(grid, foundRow, foundCol, digit);
