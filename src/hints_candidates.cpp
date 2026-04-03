@@ -42,40 +42,6 @@ CandidateGrid BuildFullCandidateGrid(const Grid& grid) {
     }
   }
 
-  // DIAGNOSTIC: Check for divergence between legal candidates and pencil marks
-  // This helps identify when pencil marks get out of sync with actual legal moves
-  for (int row = 0; row < kGridSize; ++row) {
-    for (int col = 0; col < kGridSize; ++col) {
-      if (grid[row][col].value == 0 && grid[row][col].pencil.any()) {
-        const std::bitset<9>& legal = candidates[row][col];
-        const std::bitset<9>& marks = grid[row][col].pencil;
-
-        // Check if marks have candidates that aren't legal
-        std::bitset<9> illegal = marks & ~legal;
-        if (illegal.any()) {
-          std::cerr << "DIVERGENCE at r" << (row + 1) << "c" << (col + 1)
-                    << ": pencil has " << marks.count() << " marks but only "
-                    << legal.count() << " legal. Illegal marks: ";
-          for (int d = 0; d < 9; ++d) {
-            if (illegal.test(d)) std::cerr << (d + 1) << " ";
-          }
-          std::cerr << std::endl;
-        }
-
-        // Check if legal candidates aren't in marks (marks are too restrictive)
-        std::bitset<9> missing = legal & ~marks;
-        if (missing.any()) {
-          std::cerr << "RESTRICTION at r" << (row + 1) << "c" << (col + 1)
-                    << ": " << missing.count() << " legal candidates missing from pencil marks: ";
-          for (int d = 0; d < 9; ++d) {
-            if (missing.test(d)) std::cerr << (d + 1) << " ";
-          }
-          std::cerr << std::endl;
-        }
-      }
-    }
-  }
-
   return candidates;
 }
 
