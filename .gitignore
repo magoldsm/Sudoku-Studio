@@ -17,3 +17,6 @@ imgui.ini
 # OS noise
 .DS_Store
 sudoku_icon.svg
+
+# Claude Code settings (local development)
+.claude/settings.json
