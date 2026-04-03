@@ -81,7 +81,7 @@ set(CPACK_NSIS_URL_INFO_ABOUT "https://github.com/yourusername/sudoku-studio")
 set(CPACK_NSIS_CONTACT "support@sudoku-studio.local")
 set(CPACK_NSIS_CREATE_ICONS_EXTRA
   "CreateDirectory '$SMPROGRAMS\\\\Sudoku Studio'"
-  "CreateShortCut '$SMPROGRAMS\\\\Sudoku Studio\\\\Sudoku Studio.lnk' '$INSTDIR\\\\bin\\\\sudoku_ui.exe' '' '$INSTDIR\\\\docs\\\\icon.ico'"
+  "CreateShortCut '$SMPROGRAMS\\\\Sudoku Studio\\\\Sudoku Studio.lnk' '$INSTDIR\\\\sudoku_ui.exe' '' '$INSTDIR\\\\sudoku_ui.exe'"
   "CreateShortCut '$SMPROGRAMS\\\\Sudoku Studio\\\\Uninstall Sudoku Studio.lnk' '$INSTDIR\\\\Uninstall.exe'"
 )
 set(CPACK_NSIS_DELETE_ICONS_EXTRA
