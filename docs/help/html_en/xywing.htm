@@ -1,0 +1,246 @@
+<html>
+<head>
+<title>XY-Wing</title>
+</head>
+<body>
+<h2>XY-Wing</h2>
+This is similar to a short <a href="forcingchain.htm" target="content">forcing chain</a> consisting of two links for each candidate, but instead of placing a number, it allows for candidate elimination.
+This a very common pattern in the harder puzzles.
+<p>In the partial puzzle below, consider the cells that have only the candidates
+shown:
+</p><div align="center">
+  <table border="2" width="200" cellspacing="0" cellpadding="0" bgcolor="white" bordercolor="black">
+    <tr>
+      <td width="33%" valign="middle" align="center">
+        <table border="1" width="100%">
+          <tr>
+            <td width="33%">&nbsp;</td>
+            <td width="33%">&nbsp;</td>
+            <td width="33%" valign="middle" align="center">&nbsp;</td>
+          </tr>
+          <tr>
+            <td>&nbsp;</td>
+            <td align="center">XY</td>
+            <td>&nbsp;</td>
+          </tr>
+          <tr>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+          </tr>
+        </table>
+      </td>
+      <td width="33%" valign="middle" align="center">
+        <table border="1" width="100%">
+          <tr>
+            <td width="33%">&nbsp;</td>
+            <td width="33%">&nbsp;</td>
+            <td width="33%">&nbsp;</td>
+          </tr>
+          <tr>
+            <td>&nbsp;</td>
+            <td align="center">XZ</td>
+            <td>&nbsp;</td>
+          </tr>
+          <tr>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td width="33%" valign="middle" align="center">
+        <table border="1" width="100%">
+          <tr>
+            <td align="center" width="33%">&nbsp;</td>
+            <td align="center" width="33%">&nbsp;</td>
+            <td width="33%">&nbsp;</td>
+          </tr>
+          <tr>
+            <td valign="middle" align="center">&nbsp;</td>
+            <td valign="middle" align="center">YZ</td>
+            <td>&nbsp;</td>
+          </tr>
+          <tr>
+            <td align="center">&nbsp;</td>
+            <td align="center">&nbsp;</td>
+            <td>&nbsp;</td>
+          </tr>
+        </table>
+      </td>
+      <td width="33%" valign="middle" align="center">
+        <table border="1" width="100%">
+          <tr>
+            <td width="33%">&nbsp;</td>
+            <td width="33%">&nbsp;</td>
+            <td width="33%">&nbsp;</td>
+          </tr>
+          <tr>
+            <td>&nbsp;</td>
+            <td align="center" bgcolor="#FFFFCC">*</td>
+            <td>&nbsp;</td>
+          </tr>
+          <tr>
+            <td align="center">&nbsp;</td>
+            <td align="center">&nbsp;</td>
+            <td align="center">&nbsp;</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</div>
+  <p>It can be easily seen that whichever value is in XY, the cell marked with
+  the asterisk cannot be Z.
+  <blockquote>
+    <p>	if XY = X, then XZ = Z, so * cannot be Z<br>
+	if XY = Y, then YZ = Z, so * cannot be Z</p>
+  </blockquote>
+  This allows Z to be eliminated from the candidates for the marked cell.<br><br>
+  The cells don't need to form a perfect rectangle, but XY and XZ, and XY and YZ need to be linked by being in the same unit (that is the same column, row or block.) Once you've got this arrangement, you can eliminate Z from the candidates of all cells that occupy the intersection of the units containing XZ and
+  YZ.
+  <p>&nbsp;
+  <p>Other possible combinations:<br>
+  <div align="center">
+  <table border="2" width="200" cellspacing="0" cellpadding="0" bgcolor="white" bordercolor="black">
+    <tr>
+      <td width="33%" valign="middle" align="center">
+        <table border="1" width="100%">
+          <tr>
+            <td width="33%">&nbsp;</td>
+            <td width="33%" align="center">XY</td>
+            <td width="33%">&nbsp;</td>
+          </tr>
+          <tr>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+            <td align="center">&nbsp;</td>
+          </tr>
+          <tr>
+            <td align="center">YZ</td>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+          </tr>
+        </table>
+      </td>
+      <td width="33%" valign="middle" align="center">
+        <table border="1" width="100%">
+          <tr>
+            <td width="33%">&nbsp;</td>
+            <td width="33%" align="center">XZ</td>
+            <td width="33%">&nbsp;</td>
+          </tr>
+          <tr>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+          </tr>
+          <tr>
+            <td align="center" bgcolor="#FFFFCC">*</td>
+            <td align="center" bgcolor="#FFFFCC">*</td>
+            <td align="center" bgcolor="#FFFFCC">*</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+   <p>&nbsp;</p>
+   <table border="2" width="200" cellspacing="0" cellpadding="0" bgcolor="white" bordercolor="black">
+    <tr>
+      <td width="33%" valign="middle" align="center">
+        <table border="1" width="100%">
+          <tr>
+            <td width="33%" align="center" bgcolor="#FFFFCC">*</td>
+            <td width="33%" align="center">XY</td>
+            <td width="33%" valign="middle" align="center" bgcolor="#FFFFCC">*</td>
+          </tr>
+          <tr>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+          </tr>
+          <tr>
+            <td align="center">YZ</td>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+          </tr>
+        </table>
+      </td>
+      <td width="33%" valign="middle" align="center">
+        <table border="1" width="100%">
+          <tr>
+            <td width="33%">&nbsp;</td>
+            <td width="33%">XZ</td>
+            <td width="33%">&nbsp;</td>
+          </tr>
+          <tr>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+          </tr>
+          <tr>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</div>
+   <p>&nbsp;</p>
+   <p>The astute among you will notice both the above examples have XY, XZ and
+   YZ in the same relative locations, and so can be combined to give:</p>
+  <div align="center">
+   <table border="2" width="200" cellspacing="0" cellpadding="0" bgcolor="white" bordercolor="black">
+    <tr>
+      <td width="33%" valign="middle" align="center">
+        <table border="1" width="100%">
+          <tr>
+            <td width="33%" align="center" bgcolor="#FFFFCC">*</td>
+            <td width="33%" align="center">XY</td>
+            <td width="33%" valign="middle" align="center" bgcolor="#FFFFCC">*</td>
+          </tr>
+          <tr>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+          </tr>
+          <tr>
+            <td align="center">YZ</td>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+          </tr>
+        </table>
+      </td>
+      <td width="33%" valign="middle" align="center">
+        <table border="1" width="100%">
+          <tr>
+            <td width="33%">&nbsp;</td>
+            <td width="33%">XZ</td>
+            <td width="33%">&nbsp;</td>
+          </tr>
+          <tr>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
+          </tr>
+          <tr>
+            <td align="center" bgcolor="#FFFFCC">*</td>
+            <td align="center" bgcolor="#FFFFCC">*</td>
+            <td align="center" bgcolor="#FFFFCC">*</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</div>
+  <p>All the cells marked with an asterisk can have Z removed from their
+  candidates.
+<p>In the puzzle below, the XY-wing in the green cells allows 7 to be eliminated
+from the blue ones.</p>
+<p><img src="../images/sudokuxywing.png" width="379" height="380"></p>
+</body>
+</html>

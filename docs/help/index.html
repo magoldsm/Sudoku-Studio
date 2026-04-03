@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Sudoku Studio - Help</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: Arial, sans-serif;
+    color: #333;
+  }
+
+  #container {
+    display: flex;
+    height: 100vh;
+  }
+
+  #sidebar {
+    width: 250px;
+    background-color: #2c3e50;
+    color: white;
+    padding: 20px;
+    overflow-y: auto;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+  }
+
+  #sidebar h2 {
+    margin-bottom: 20px;
+    font-size: 18px;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+  }
+
+  #sidebar ul {
+    list-style: none;
+  }
+
+  #sidebar ul li {
+    margin-bottom: 8px;
+  }
+
+  #sidebar ul li a {
+    color: #ecf0f1;
+    text-decoration: none;
+    display: block;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+  }
+
+  #sidebar ul li a:hover {
+    background-color: #34495e;
+  }
+
+  #sidebar .section-title {
+    font-weight: bold;
+    color: #3498db;
+    margin-top: 15px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    text-transform: uppercase;
+  }
+
+  #content {
+    flex: 1;
+    border: none;
+  }
+
+  .welcome {
+    background: linear-gradient(135deg, #3498db 0%, #2c3e50 100%);
+    color: white;
+    padding: 40px;
+    border-radius: 8px;
+    margin: 40px;
+  }
+
+  .welcome h1 {
+    margin-bottom: 10px;
+  }
+
+  .welcome p {
+    font-size: 16px;
+    margin-bottom: 10px;
+  }
+</style>
+</head>
+<body>
+  <div id="container">
+    <div id="sidebar">
+      <h2>Contents</h2>
+
+      <div class="section-title">Getting Started</div>
+      <ul>
+        <li><a href="html_en/what.htm" target="content">What is Sudoku?</a></li>
+        <li><a href="html_en/how.htm" target="content">How to Play</a></li>
+      </ul>
+
+      <div class="section-title">Solving Techniques</div>
+      <ul>
+        <li><a href="html_en/solvingtechniques.htm" target="content">Overview</a></li>
+        <li><a href="html_en/nakedsingle.htm" target="content">Naked Single</a></li>
+        <li><a href="html_en/hiddensingle.htm" target="content">Hidden Single</a></li>
+        <li><a href="html_en/blockcolrow.htm" target="content">Block/Col/Row</a></li>
+        <li><a href="html_en/blockblock.htm" target="content">Block/Block</a></li>
+        <li><a href="html_en/nakedsubset.htm" target="content">Naked Subset</a></li>
+        <li><a href="html_en/hiddensubset.htm" target="content">Hidden Subset</a></li>
+        <li><a href="html_en/xwing.htm" target="content">X-Wing & Swordfish</a></li>
+        <li><a href="html_en/xywing.htm" target="content">XY-Wing</a></li>
+        <li><a href="html_en/xyzwing.htm" target="content">XYZ-Wing</a></li>
+        <li><a href="html_en/xychain.htm" target="content">XY-Chain</a></li>
+        <li><a href="html_en/colouring.htm" target="content">Colouring</a></li>
+        <li><a href="html_en/remotepairs.htm" target="content">Remote Pairs</a></li>
+        <li><a href="html_en/forcingchain.htm" target="content">Forcing Chains</a></li>
+        <li><a href="html_en/trialanderror.htm" target="content">Trial and Error</a></li>
+      </ul>
+
+      <div class="section-title">Reference</div>
+      <ul>
+        <li><a href="html_en/glossary.htm" target="content">Glossary</a></li>
+        <li><a href="html_en/faq.htm" target="content">FAQ</a></li>
+      </ul>
+
+      <div class="section-title">Interface</div>
+      <ul>
+        <li><a href="html_en/toolbar.htm" target="content">Toolbar</a></li>
+        <li><a href="html_en/options1.htm" target="content">Options</a></li>
+      </ul>
+    </div>
+
+    <iframe id="content" name="content" src="html_en/welcome.htm"></iframe>
+  </div>
+
+  <script>
+    // Inject base tag into iframe to make all links target the iframe
+    const contentFrame = document.getElementById('content');
+    contentFrame.onload = function() {
+      try {
+        const iframeDoc = contentFrame.contentDocument || contentFrame.contentWindow.document;
+        const base = iframeDoc.createElement('base');
+        base.target = 'content';
+        iframeDoc.head.insertBefore(base, iframeDoc.head.firstChild);
+      } catch (e) {
+        // Cross-origin or other access issues - silently ignore
+      }
+    };
+  </script>
+</body>
+</html>

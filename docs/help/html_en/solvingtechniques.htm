@@ -1,0 +1,60 @@
+<html>
+<head>
+<title>techniques</title>
+</head>
+<body>
+<h1>Solving Techniques</h1>
+<p>These are some of the techniques that can be used to solve Sudoku puzzles.
+See the <a href="glossary.htm" target="content">glossary</a> for an explanation of the terms used.</p>
+<h3>Naked Single / Singleton / Sole Candidate</h3>
+<p>It is often the case that a cell can only possibly take a single value, when the contents of the other cells in the same row, column and block are considered. <a href="nakedsingle.htm" target="content">More&nbsp;&raquo;</a></p>
+
+<h3>Hidden Single / Unique Candidate</h3>
+<p>If a cell is the only one in a row, column or block that can take a particular value,
+then it must have that value. <a href="hiddensingle.htm" target="content">More&nbsp;&raquo;</a></p>
+
+<p>With the notable exception of forcing chains, the remaining techniques are all about reducing the number of candidates for cells. The aim being to reduce the candidates to such an extent that
+the first two techniques can be used.</p>
+
+<h3>Block and Column / Row Interactions</h3>
+<p>Sometimes, when you examine a block, you can determine that a certain number must be in a specific row or column, even though you cannot determine exactly which cell in that row or column. <a href="blockcolrow.htm" target="content">More&nbsp;&raquo;</a></p>
+
+<h3>Block / Block Interactions</h3>
+<p>If a number appears as candidates for two cells in two different blocks, but both cells are in the same column or row, it is possible to remove that number as a candidate for other cells in that column or row. <a href="blockblock.htm" target="content">More&nbsp;&raquo;</a></p>
+
+<h3>Naked Pair, Triplet, Quad / Naked Subset / Disjoint Subset</h3>
+<p>If two cells in the same row, column or block have only the same two candidates, then those candidates can be removed from other cells in that row, column or block. This technique can also be extended to cover more that two cells. <a href="nakedsubset.htm" target="content">More&nbsp;&raquo;</a></p>
+
+<h3>Hidden Pair, Triplet, Quad / Hidden Subset / Unique Subset</h3>
+<p>This technique is very similar to naked subsets, but instead of affecting other
+cells with the same row, column or block, candidates are eliminated from the
+cells that hold the hidden subset. <a href="hiddensubset.htm" target="content">More&nbsp;&raquo;</a></p>
+
+<h3>X-Wing and Swordfish</h3>
+<p>These are more methods of reducing the candidates when two rows have the
+same candidate only in the same two columns. <a href="xwing.htm" target="content">More&nbsp;&raquo;</a></p>
+
+<h3>XY-Wing</h3>
+<p>This is similar to a short forcing chain consisting of two links for each candidate, but instead of placing a number, it allows for candidate elimination. <a href="xywing.htm" target="content">More&nbsp;&raquo;</a></p>
+
+<h3>XYZ-Wing</h3>
+<p>This is a variation of an XY-wing. <a href="xyzwing.htm" target="content">More&nbsp;&raquo;</a></p>
+
+<h3>Colouring</h3>
+<p>Colouring considers cells where a particular candidate occurs for only two  cells in a unit.
+<a href="colouring.htm" target="content">More&nbsp;&raquo;</a></p>
+
+<h3>XY-Chain</h3>
+<p>This is a technique that allows you to make eliminations by following a chain of cells that have only two candidates each. <a href="xychain.htm" target="content">More&nbsp;&raquo;</a></p>
+
+<h3>Forcing Chains</h3>
+<p>Forcing chains is a technique that allows you to deduce with certainty the
+content of a cell from considering the implications resulting from the placement
+of each of another cell's
+candidates. <a href="forcingchain.htm" target="content">More&nbsp;&raquo;</a></p>
+
+<h3>Trial and Error</h3>
+<p>There are some that would argue trial and error is not a logical technique, and is no better than guessing. When further moves seem impossible, trial and error
+may be the only way forward. <a href="trialanderror.htm" target="content">More&nbsp;&raquo;</a></p>
+</body>
+</html>

@@ -66,6 +66,53 @@ cmake --build build
 
 All dependencies (GLFW, Dear ImGui, OpenGL) are fetched automatically by CMake and are fully cross-platform. No additional configuration needed.
 
+### Building a Windows Installer
+
+To create a distributable Windows installer (.exe):
+
+**Prerequisites:**
+- NSIS 3.0+ ([Download](https://nsis.sourceforge.io/))
+- The project built in Release mode (see Windows build above)
+
+**Steps:**
+
+1. Open a command prompt in the project root directory:
+```bash
+cd C:\path\to\sudoku
+```
+
+2. Create the build directory and configure:
+```bash
+cmake -S . -B build -G "Visual Studio 17 2022"
+```
+
+3. Build the project in Release mode:
+```bash
+cmake --build build --config Release
+```
+
+4. Generate the installer using CPack:
+```bash
+cd build
+cpack -G NSIS
+```
+
+This will create `SudokuStudio-1.0.0-win64.exe` in the build directory.
+
+**What's included in the installer:**
+- Sudoku Studio executable
+- Complete help system (HTML interface with table of contents and all solving technique guides)
+- Start menu shortcuts
+- Desktop shortcut
+- Windows uninstaller and registry entries
+
+**Customization:**
+To customize the installer (package name, version, website URLs, icon), edit these settings in `CMakeLists.txt` (lines 63–88):
+- `CPACK_PACKAGE_NAME` — Application name
+- `CPACK_PACKAGE_VERSION` — Version number
+- `CPACK_NSIS_HELP_LINK` — Help/website URL
+- `CPACK_NSIS_URL_INFO_ABOUT` — Project information URL
+
 ## Run
 
 **Linux / macOS:**

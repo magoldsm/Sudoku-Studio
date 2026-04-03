@@ -3,6 +3,7 @@
 #include <atomic>
 #include <bitset>
 #include <chrono>
+#include <cstdio>
 #include <filesystem>
 #include <iostream>
 #include <mutex>
@@ -40,21 +41,106 @@ constexpr std::array<ImU32, 10> kTagColors = {
     IM_COL32(217, 249, 157, 255),  // 9: Light Green-Yellow
 };
 
-  void PushUndoState(std::vector<Grid>& undoHistory, const Grid& grid) {
-    if (undoHistory.size() >= kMaxUndoHistory) {
-      undoHistory.erase(undoHistory.begin());
+void OpenHelpInBrowser() {
+  // Try multiple possible locations for the help file
+  std::vector<std::string> candidates = {
+    "docs/help/index.html",
+    "../docs/help/index.html",
+    "../../docs/help/index.html",
+  };
+
+  std::string helpPath;
+  for (const auto& candidate : candidates) {
+    if (std::filesystem::exists(candidate)) {
+      helpPath = std::filesystem::absolute(candidate).string();
+      std::cerr << "Found help file at: " << helpPath << std::endl;
+      break;
     }
-    undoHistory.push_back(grid);
   }
 
-  bool UndoLastChange(Grid& grid, std::vector<Grid>& undoHistory) {
-    if (undoHistory.empty()) {
-      return false;
-    }
-    grid = undoHistory.back();
-    undoHistory.pop_back();
-    return true;
+  if (helpPath.empty()) {
+    std::cerr << "Error: Could not find help file at docs/help/index.html" << std::endl;
+    return;
   }
+
+  #ifdef _WIN32
+    // Use file:// URL for Windows
+    std::string fileUrl = "file:///" + helpPath;
+    // Replace backslashes with forward slashes
+    std::replace(fileUrl.begin(), fileUrl.end(), '\\', '/');
+    std::string command = "start \"\" \"" + fileUrl + "\"";
+    std::cerr << "Opening help with Windows command: " << command << std::endl;
+    int result = system(command.c_str());
+    if (result != 0) {
+      std::cerr << "Warning: Failed to open help browser" << std::endl;
+    }
+  #else
+    // Check if running in WSL
+    bool isWSL = std::filesystem::exists("/proc/version") &&
+                 std::system("grep -qi microsoft /proc/version 2>/dev/null") == 0;
+
+    if (isWSL) {
+      // In WSL, convert Unix path to Windows UNC path using wslpath
+      // Run in background thread to avoid blocking the UI
+      std::thread([helpPath]() {
+        std::string wslpath_cmd = "wslpath -w \"" + helpPath + "\" 2>/dev/null";
+        FILE* wslpath_pipe = popen(wslpath_cmd.c_str(), "r");
+        std::string winPath;
+        if (wslpath_pipe) {
+          char buffer[512];
+          if (fgets(buffer, sizeof(buffer), wslpath_pipe) != nullptr) {
+            winPath = buffer;
+            // Remove trailing newline
+            if (!winPath.empty() && winPath.back() == '\n') {
+              winPath.pop_back();
+            }
+          }
+          pclose(wslpath_pipe);
+        }
+
+        // Convert Windows UNC path to file:// URL format
+        if (!winPath.empty()) {
+          std::replace(winPath.begin(), winPath.end(), '\\', '/');
+          std::string fileUrl = "file://" + winPath;
+
+          // Use cmd.exe to open the file:// URL in default browser
+          // Redirect output and background the process so it doesn't block
+          std::string command = "cmd.exe /c start \"\" \"" + fileUrl + "\" >/dev/null 2>&1 &";
+          std::cerr << "Opening help in Windows browser..." << std::endl;
+          system(command.c_str());
+        } else {
+          std::cerr << "Could not convert path to Windows format." << std::endl;
+        }
+      }).detach();
+      return;
+    }
+
+    // Use file:// URL for Linux/macOS
+    std::string fileUrl = "file://" + helpPath;
+    std::string command = "xdg-open \"" + fileUrl + "\" 2>/dev/null || open \"" + fileUrl + "\" 2>/dev/null";
+    std::cerr << "Opening help with: " << command << std::endl;
+    int result = system(command.c_str());
+    if (result != 0) {
+      std::cerr << "Warning: Failed to open help browser" << std::endl;
+    }
+  #endif
+}
+
+void PushUndoState(std::vector<Grid>& undoHistory, const Grid& grid) {
+  if (undoHistory.size() >= kMaxUndoHistory) {
+    undoHistory.erase(undoHistory.begin());
+  }
+  undoHistory.push_back(grid);
+}
+
+bool UndoLastChange(Grid& grid, std::vector<Grid>& undoHistory) {
+  if (undoHistory.empty()) {
+    return false;
+  }
+  grid = undoHistory.back();
+  undoHistory.pop_back();
+  return true;
+}
 
 bool IsSafeInPuzzle(const Puzzle& board, int row, int col, int digit) {
   for (int i = 0; i < kGridSize; ++i) {
@@ -1664,6 +1750,10 @@ int main(int argc, char** argv) {
           if (uiState.currentHint.revealPhase == 3) requestApplyHint = true;
           else requestHint = true;
         }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Help", "F1")) {
+          OpenHelpInBrowser();
+        }
         ImGui::EndMenu();
       }
       if (ImGui::BeginMenu("Mode")) {
@@ -1789,6 +1879,9 @@ int main(int argc, char** argv) {
     if (ImGui::IsKeyPressed(ImGuiKey_Slash)) {
       if (uiState.currentHint.revealPhase == 3) requestApplyHint = true;
       else requestHint = true;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_F1)) {
+      OpenHelpInBrowser();
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_RightArrow) || ImGui::IsKeyPressed(ImGuiKey_D)) {

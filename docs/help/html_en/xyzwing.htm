@@ -1,0 +1,66 @@
+<html>
+<head>
+<title>XYZ-Wing</title>
+</head>
+<body>
+<h2>XYZ-Wing</h2>
+<p>This is a variation of an <a href="xywing.htm" target="content">XY-wing</a>. In the partial puzzle below, consider the cells that have only the candidates shown. Any cells that share a unit with all three cells XYZ, XY and YZ, can have Z eliminated from their candidates.</p>
+
+<div align="center">
+  <table border="2" width="300" cellspacing="0" cellpadding="0" bgcolor="white" bordercolor="black">
+    <tr>
+      <td width="33%" valign="middle" align="center">
+        <table border="1" width="100%">
+              <tr>
+                <td align="center" width="33%"></td>
+                <td align="center" width="33%">YZ</td>
+                <td align="center" width="33%"></td>
+              </tr>
+              <tr>
+                <td align="center">XYZ</td>
+                <td class="highlight" align="center" bgcolor="#FFFFCC">*</td>
+                <td class="highlight" align="center" bgcolor="#FFFFCC">*</td>
+              </tr>
+              <tr>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+            </table>
+          </td>
+      <td width="33%" valign="middle" align="center">
+        <table border="1" width="100%">
+              <tr>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td></td>
+                <td align="center" width="33%">XZ</td>
+                <td></td>
+              </tr>
+              <tr>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <p><br />
+    It can be easily seen that which ever value is in XYZ, the cells marked with the asterisk cannot be Z.</p>
+    <blockquote>
+      if XYZ = X, then XZ = Z, so * cannot be Z<br />
+      if XYZ = Y, then YZ = Z, so * cannot be Z<br />
+      if XYZ = Z, then * cannot be Z
+    </blockquote>
+    This allows Z to be eliminated from the candidates for the marked cells.
+<p>In the puzzle below, the XYZ-wing in the green cells allows 1 to be
+eliminated from the blue cell.</p>
+<p><img src="../images/sudokuxyzwing.png" width="379" height="380"></p>
+</body>
+</html>

@@ -58,3 +58,36 @@ target_link_libraries(sudoku_ui PRIVATE imgui_lib)
 if(UNIX AND NOT APPLE)
   target_link_libraries(sudoku_ui PRIVATE dl pthread)
 endif()
+
+# CPack configuration for NSIS installer
+set(CPACK_GENERATOR "NSIS")
+set(CPACK_PACKAGE_NAME "Sudoku Studio")
+set(CPACK_PACKAGE_VENDOR "Sudoku Studio")
+set(CPACK_PACKAGE_VERSION "1.0.0")
+set(CPACK_PACKAGE_VERSION_MAJOR "1")
+set(CPACK_PACKAGE_VERSION_MINOR "0")
+set(CPACK_PACKAGE_VERSION_PATCH "0")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Sudoku puzzle solver and hint system")
+set(CPACK_PACKAGE_DESCRIPTION "Sudoku Studio is a comprehensive Sudoku puzzle solver with an intelligent hint system supporting 20+ solving techniques.")
+
+# NSIS specific settings
+set(CPACK_NSIS_PACKAGE_NAME "Sudoku Studio")
+set(CPACK_NSIS_DISPLAY_NAME "Sudoku Studio v1.0.0")
+set(CPACK_NSIS_INSTALLER_ICON "${CMAKE_SOURCE_DIR}/docs/icon.ico")
+set(CPACK_NSIS_MUI_ICON "${CMAKE_SOURCE_DIR}/docs/icon.ico")
+set(CPACK_NSIS_INSTALLED_IMAGE_RESOURCE_NUM "106")
+set(CPACK_NSIS_HELP_LINK "https://github.com/yourusername/sudoku-studio")
+set(CPACK_NSIS_URL_INFO_ABOUT "https://github.com/yourusername/sudoku-studio")
+set(CPACK_NSIS_CONTACT "support@sudoku-studio.local")
+set(CPACK_NSIS_CREATE_ICONS_EXTRA
+  "CreateShortCut '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Sudoku Studio.lnk' '$INSTDIR\\\\sudoku_ui.exe'"
+)
+set(CPACK_NSIS_DELETE_ICONS_EXTRA
+  "Delete '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Sudoku Studio.lnk'"
+)
+
+# Install rules for help files
+install(DIRECTORY docs/help/ DESTINATION docs/help)
+install(TARGETS sudoku_ui DESTINATION bin)
+
+include(CPack)

@@ -1,0 +1,56 @@
+<html>
+<head>
+<title>Hidden Subset</title>
+<body>
+<h2>Hidden Pair, Triplet, Quad / Hidden Subset / Unique Subset</h2>
+<p>This technique is known as &quot;hidden pair&quot; if two candidates are
+involved, &quot;hidden triplet&quot; if three, or &quot;hidden quad&quot; if
+four.</p>
+<p>This technique is very similar to naked subsets, but instead of affecting
+other cells with the same row, column or block, candidates are eliminated from
+the cells that hold the subset. If there are N cells, with N candidates between
+them that don't appear elsewhere in the same row, column or block, then any
+other candidates for those cells can be eliminated.</p>
+<p>For example, consider a block that has the following candidates:</p>
+<div class="center">
+  <p>{4, 5, 6, 9}, {4, 9}, {5, 6, 9}, {2, 4}, {<b>1</b>, 2, <b>3</b>, 4, <b>7</b>},
+  {<b>1</b>, 2, <b>3</b>, <b>7</b>}, {2, 5, 6}, {<b>1</b>, 2, <b>7</b>}, {8}</p>
+</div>
+<p>(The single {8} indicates that this cell already holds the value 8.) You can
+see that there are only three cells that have any of the candidates 1, 3 or 7.
+(These cells have other candidates too, but they're the ones that we can
+eliminate.) Three candidates with only three possible cells between them, leads
+to the conclusion that one of the candidates must be in each of the cells,
+although we can't say which is which. So, obviously, these three cells cannot
+hold any other value, meaning we can eliminate any other candidates for these
+cells.</p>
+<p>After making the elimination in this example, we're left with:</p>
+<div class="center">
+  <p>{4, 5, 6, 9}, {4, 9}, {5, 6, 9}, {2, 4}, {1, 3, 7}, {1, 3, 7}, {2, 5, 6},
+  {1, 7}, {8}</p>
+</div>
+<p>I get many emails pointing out that one of the cells doesn't have 3 as a
+candidate, but this makes no difference at all. The important point is that
+there are only three cells in which three candidates appear, even if they're not
+all in each.</p>
+<p>The second question I get asked, is why not make the subset 1, 2 and 7. The
+answer is because there are five cells containing any of these numbers, and
+three candidates over five cells doesn't allow any eliminations at all.</p>
+<p>In the puzzle below, the green cells have the hidden pair 3 and 5.</p>
+<p><img src="../images/sudokuhiddenpair.png" width="379" height="380"></p>
+<p>Naked subsets and hidden subsets are related - I usually describe them as
+being opposite sides of the same coin. If a naked subset is present, then so is
+a hidden one, although it may be longer and so harder to spot. The opposite is
+also true, if a hidden subset is present, so is a naked one. They obey the
+following relationship:</p>
+<div class="center">
+  <p>NumberOfDigitsInNakedSubset + NumberOfDigitsInHiddenSubset +
+  NumberOfFilledCellsInUnit = 9</p>
+</div>
+<p>or to put it another way:</p>
+<div class="center">
+  <p>NumberOfDigitsInNakedSubset + NumberOfDigitsInHiddenSubset =
+  NumberOfEmptyCellsInUnit</p>
+</div>
+</body>
+</html>
