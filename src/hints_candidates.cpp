@@ -30,21 +30,6 @@ CandidateGrid BuildCandidateGrid(const Grid& grid) {
   return candidates;
 }
 
-CandidateGrid BuildFullCandidateGrid(const Grid& grid) {
-  CandidateGrid candidates{};
-  for (int row = 0; row < kGridSize; ++row) {
-    for (int col = 0; col < kGridSize; ++col) {
-      if (grid[row][col].value != 0) {
-        candidates[row][col].reset();
-      } else {
-        candidates[row][col] = ComputeCandidates(grid, row, col);
-      }
-    }
-  }
-
-  return candidates;
-}
-
 std::vector<UnitCells> BuildAllUnits() {
   std::vector<UnitCells> units;
   // 9 rows + 9 columns + 9 boxes.

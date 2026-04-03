@@ -1459,22 +1459,6 @@ int ApplyAutoPencil(Grid& grid) {
   return changedCells;
 }
 
-bool HasStaleOrIncorrectPencilMarks(const Grid& grid) {
-  for (int row = 0; row < kGridSize; ++row) {
-    for (int col = 0; col < kGridSize; ++col) {
-      const Cell& cell = grid[row][col];
-      if (cell.value == 0) {
-        // Unsolved cell: check if pencil marks match legal candidates
-        const std::bitset<9> legalCandidates = ComputeCandidates(grid, row, col);
-        if (cell.pencil != legalCandidates) {
-          return true;  // Mismatch found
-        }
-      }
-    }
-  }
-  return false;  // All pencil marks are consistent
-}
-
 std::vector<int> GetMissingCandidates(const Grid& grid, int row, int col) {
   const Cell& cell = grid[row][col];
   std::vector<int> missing;
@@ -2765,8 +2749,7 @@ Hint GenerateHint(const Grid& grid) {
   };
 
   // Ordered from easier/common techniques to heavier analysis.
-  // For basic techniques, return hints directly from detectors since they're based on
-  // rebuild legal candidates (BuildFullCandidateGrid). Pencil marks may not be in sync.
+  // Candidates are built from user's pencil marks, which are the source of truth.
   if (Hint h = DetectNakedSingles(candidates); h.IsValid()) return h;
   if (Hint h = DetectHiddenSingles(candidates); h.IsValid()) return h;
 

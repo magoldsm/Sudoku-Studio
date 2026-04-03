@@ -62,8 +62,6 @@ Hint GenerateHint(const Grid& grid);
 int ApplyHint(Grid& grid, const Hint& hint);
 // Rebuilds legal pencil marks for unsolved cells; returns changed cell count.
 int ApplyAutoPencil(Grid& grid);
-// Checks if user's pencil marks differ from legal candidates; reports mismatch if found.
-bool HasStaleOrIncorrectPencilMarks(const Grid& grid);
 // Computes missing legal candidates for a specific cell (what user erased that's still legal)
 std::vector<int> GetMissingCandidates(const Grid& grid, int row, int col);
 // Validates user's pencil marks against legal candidates; returns erased-but-legal candidates
