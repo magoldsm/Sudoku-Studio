@@ -1085,7 +1085,6 @@ Hint DetectXYChain(const CandidateGrid& candidates) {
                 }
                 if (SharesUnit(row, col, startCell.row, startCell.col) &&
                     SharesUnit(row, col, nextCell.row, nextCell.col)) {
-                  std::cerr << "DEBUG XY-Chain: Adding elimination target r" << (row+1) << "c" << (col+1) << " digit " << (heldDigit+1) << std::endl;
                   AddUniqueCell(affected, row, col);
                   hasElimination = true;
                 }
@@ -1093,11 +1092,8 @@ Hint DetectXYChain(const CandidateGrid& candidates) {
             }
 
             if (hasElimination) {
-              std::cerr << "DEBUG XY-Chain: Found chain with " << affected.size() << " affected cells" << std::endl;
               return MakeHint("XY-Chain", affected, {heldDigit + 1}, {startCell, nextCell},
                               chainCells);
-            } else {
-              std::cerr << "DEBUG XY-Chain: Chain found but no elimination targets" << std::endl;
             }
           } else {
             // Chain not yet closed — extend it.
@@ -2738,36 +2734,128 @@ int ApplyHint(Grid& grid, const Hint& hint) {
   return 0;
 }
 
+int ApplyHintWithCandidates(Grid& grid, const Hint& hint, const CandidateGrid& candidates) {
+  const std::string& name = hint.techniqueName;
+
+  // For basic techniques, manually apply using the provided candidates
+  if (name == "Naked Single") {
+    int changes = 0;
+    for (int r = 0; r < kGridSize; ++r) {
+      for (int c = 0; c < kGridSize; ++c) {
+        if (grid[r][c].value == 0 && candidates[r][c].count() == 1) {
+          for (int d = 0; d < 9; ++d) {
+            if (candidates[r][c].test(d)) {
+              grid[r][c].value = d + 1;
+              grid[r][c].pencil.reset();
+              RemoveDigitFromPeerPencils(grid, r, c, d + 1);
+              changes++;
+              break;
+            }
+          }
+        }
+      }
+    }
+    return changes;
+  }
+
+  if (name == "Hidden Single") {
+    int changes = 0;
+    // Check rows
+    for (int r = 0; r < kGridSize; ++r) {
+      for (int d = 0; d < 9; ++d) {
+        int col = -1;
+        int count = 0;
+        for (int c = 0; c < kGridSize; ++c) {
+          if (grid[r][c].value == 0 && candidates[r][c].test(d)) {
+            col = c;
+            count++;
+          }
+        }
+        if (count == 1 && grid[r][col].value == 0) {
+          grid[r][col].value = d + 1;
+          grid[r][col].pencil.reset();
+          RemoveDigitFromPeerPencils(grid, r, col, d + 1);
+          changes++;
+        }
+      }
+    }
+    // Check columns
+    for (int c = 0; c < kGridSize; ++c) {
+      for (int d = 0; d < 9; ++d) {
+        int row = -1;
+        int count = 0;
+        for (int r = 0; r < kGridSize; ++r) {
+          if (grid[r][c].value == 0 && candidates[r][c].test(d)) {
+            row = r;
+            count++;
+          }
+        }
+        if (count == 1 && grid[row][c].value == 0) {
+          grid[row][c].value = d + 1;
+          grid[row][c].pencil.reset();
+          RemoveDigitFromPeerPencils(grid, row, c, d + 1);
+          changes++;
+        }
+      }
+    }
+    // Check boxes
+    for (int box = 0; box < kGridSize; ++box) {
+      int boxRow = (box / 3) * 3;
+      int boxCol = (box % 3) * 3;
+      for (int d = 0; d < 9; ++d) {
+        int row = -1, col = -1;
+        int count = 0;
+        for (int r = boxRow; r < boxRow + 3; ++r) {
+          for (int c = boxCol; c < boxCol + 3; ++c) {
+            if (grid[r][c].value == 0 && candidates[r][c].test(d)) {
+              row = r;
+              col = c;
+              count++;
+            }
+          }
+        }
+        if (count == 1 && grid[row][col].value == 0) {
+          grid[row][col].value = d + 1;
+          grid[row][col].pencil.reset();
+          RemoveDigitFromPeerPencils(grid, row, col, d + 1);
+          changes++;
+        }
+      }
+    }
+    return changes;
+  }
+
+  // For other techniques, fall back to regular ApplyHint
+  return ApplyHint(grid, hint);
+}
+
 Hint GenerateHint(const Grid& grid) {
   // Use user's pencil marks as source of truth; respect their eliminations
   const CandidateGrid candidates = BuildCandidateGrid(grid);
 
-  // DEBUG: check r6c4 candidate state
-  std::cerr << "DEBUG: r6c4 (grid[5][3]) candidates: ";
-  for (int d = 0; d < 9; ++d) {
-    if (candidates[5][3].test(d)) std::cerr << (d+1) << " ";
-  }
-  std::cerr << std::endl;
-  std::cerr << "DEBUG: r6c4 pencil marks: ";
-  for (int d = 0; d < 9; ++d) {
-    if (grid[5][3].pencil.test(d)) std::cerr << (d+1) << " ";
-  }
-  std::cerr << std::endl;
+  // Helper: store the candidates used to detect this hint, then test if it's actionable
+  auto WithCandidates = [&](Hint h) -> Hint {
+    if (h.IsValid()) {
+      h.usedCandidates = candidates;
+    }
+    return h;
+  };
 
-  // Helper: returns the hint only if it would actually change the pencil state.
-  // Detectors use full legal candidates; pencil marks may have already captured
-  // the same eliminations, so we test-apply before committing.
+  // Helper: returns the hint only if it would actually change the puzzle state.
+  // Test-apply before committing to ensure the hint is actionable, using the same
+  // candidates it was detected with to ensure consistency.
   auto ActionableHint = [&](Hint h) -> Hint {
+    h = WithCandidates(h);
     if (!h.IsValid()) return {};
     Grid testGrid = grid;
-    if (ApplyHint(testGrid, h) == 0) return {};
+    if (ApplyHintWithCandidates(testGrid, h, candidates) == 0) return {};
     return h;
   };
 
   // Ordered from easier/common techniques to heavier analysis.
   // Candidates are built from user's pencil marks, which are the source of truth.
-  if (Hint h = DetectNakedSingles(candidates); h.IsValid()) return h;
-  if (Hint h = DetectHiddenSingles(candidates); h.IsValid()) return h;
+  if (Hint h = WithCandidates(DetectNakedSingles(candidates)); h.IsValid()) return h;
+  if (Hint h = WithCandidates(DetectHiddenSingles(candidates)); h.IsValid()) return h;
 
   const std::array<Hint (*)(const CandidateGrid&), 8> detectors = {
       DetectPointingPairs,

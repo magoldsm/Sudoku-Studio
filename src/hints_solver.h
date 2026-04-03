@@ -60,6 +60,8 @@ int GetTechniqueScore(SolvingTechnique technique);
 Hint GenerateHint(const Grid& grid);
 // Applies the technique named in hint.techniqueName; returns number of changes.
 int ApplyHint(Grid& grid, const Hint& hint);
+// Applies hint using the candidate grid it was detected with (ensures consistency)
+int ApplyHintWithCandidates(Grid& grid, const Hint& hint, const CandidateGrid& candidates);
 // Rebuilds legal pencil marks for unsolved cells; returns changed cell count.
 int ApplyAutoPencil(Grid& grid);
 // Computes missing legal candidates for a specific cell (what user erased that's still legal)

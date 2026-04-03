@@ -1569,18 +1569,6 @@ int main(int argc, char** argv) {
         uiState.currentHint = GenerateHint(puzzleState.grid);
         uiState.currentHint.revealPhase = 1;
 
-        // DEBUG: Log the hint that was generated
-        std::cerr << "DEBUG MAIN: Generated hint: " << uiState.currentHint.techniqueName;
-        if (!uiState.currentHint.involvedDigits.empty()) {
-          std::cerr << " digits: ";
-          for (int d : uiState.currentHint.involvedDigits) std::cerr << d << " ";
-        }
-        std::cerr << " affected cells: ";
-        for (const HintCell& hc : uiState.currentHint.affectedCells) {
-          std::cerr << "r" << (hc.row+1) << "c" << (hc.col+1) << " ";
-        }
-        std::cerr << std::endl;
-
         // Compute missing candidates for hint-affected cells (only those relevant to the hint)
         uiState.hintMissingCandidates.clear();
         for (const HintCell& cell : uiState.currentHint.affectedCells) {
@@ -1595,9 +1583,6 @@ int main(int argc, char** argv) {
             }
           }
           if (!relevantMissing.empty()) {
-            std::cerr << "DEBUG MAIN: r" << (cell.row+1) << "c" << (cell.col+1) << " missing (relevant): ";
-            for (int d : relevantMissing) std::cerr << d << " ";
-            std::cerr << std::endl;
             uiState.hintMissingCandidates.push_back({cell.row, cell.col, relevantMissing});
           }
         }
@@ -1623,7 +1608,8 @@ int main(int argc, char** argv) {
     if (requestApplyHint && uiState.currentHint.revealPhase == 3) {
       const std::string name = uiState.currentHint.techniqueName;
       PushUndoState(uiState.undoHistory, puzzleState.grid);
-      ApplyHint(puzzleState.grid, uiState.currentHint);
+      // Use ApplyHintWithCandidates to ensure we apply with the same candidates the hint was detected with
+      ApplyHintWithCandidates(puzzleState.grid, uiState.currentHint, uiState.currentHint.usedCandidates);
       uiState.statusMessage = "Applied: " + name;
       uiState.statusFrames = 300;
       ClearHint(uiState);

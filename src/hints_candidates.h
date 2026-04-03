@@ -8,9 +8,6 @@
 
 namespace sudoku {
 
-// Candidate grid: for each cell, which digits are legal candidates
-using CandidateGrid = std::array<std::array<std::bitset<9>, kGridSize>, kGridSize>;
-
 // A unit is a row, column, or box with 9 cells
 struct UnitCells {
   std::array<HintCell, 9> cells;

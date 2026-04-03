@@ -15,6 +15,8 @@ constexpr float kCellSize = 72.0f;
 constexpr float kBoardSize = kCellSize * static_cast<float>(kGridSize);
 
 using Puzzle = std::array<std::array<int, kGridSize>, kGridSize>;
+// Candidate grid: for each cell, which digits are legal candidates
+using CandidateGrid = std::array<std::array<std::bitset<9>, kGridSize>, kGridSize>;
 
 enum class InputMode {
   kDigit,
@@ -89,6 +91,8 @@ struct Hint {
   // 0 = none, 1 = technique name, 2 = cells highlighted, 3 = digits highlighted.
   int revealPhase = 0;
   ValidationWarning validation;  // Populated when no solving hint found
+  // Candidate grid used to detect this hint (ensures apply uses same logic)
+  CandidateGrid usedCandidates{};
 
   bool IsValid() const {
     return !techniqueName.empty() && !affectedCells.empty();
