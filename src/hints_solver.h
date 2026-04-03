@@ -62,6 +62,8 @@ Hint GenerateHint(const Grid& grid);
 int ApplyHint(Grid& grid, const Hint& hint);
 // Rebuilds legal pencil marks for unsolved cells; returns changed cell count.
 int ApplyAutoPencil(Grid& grid);
+// Checks if user's pencil marks differ from legal candidates; reports mismatch if found.
+bool HasStaleOrIncorrectPencilMarks(const Grid& grid);
 // Applies one pass of placements; returns number of placed values.
 int ApplyNakedSingles(Grid& grid);
 int ApplyHiddenSingles(Grid& grid);

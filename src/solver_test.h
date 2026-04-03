@@ -16,4 +16,7 @@ int TestGenerationAndSolving();
 // Stress test the hint system with generated puzzles
 int RunHintStressTest(int durationSeconds = 0);
 
+// Debug XY-Chain detection with detailed logging
+void DebugXYChain(const std::string& snapshotPath);
+
 }  // namespace sudoku

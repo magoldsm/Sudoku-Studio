@@ -1459,6 +1459,22 @@ int ApplyAutoPencil(Grid& grid) {
   return changedCells;
 }
 
+bool HasStaleOrIncorrectPencilMarks(const Grid& grid) {
+  for (int row = 0; row < kGridSize; ++row) {
+    for (int col = 0; col < kGridSize; ++col) {
+      const Cell& cell = grid[row][col];
+      if (cell.value == 0) {
+        // Unsolved cell: check if pencil marks match legal candidates
+        const std::bitset<9> legalCandidates = ComputeCandidates(grid, row, col);
+        if (cell.pencil != legalCandidates) {
+          return true;  // Mismatch found
+        }
+      }
+    }
+  }
+  return false;  // All pencil marks are consistent
+}
+
 int ApplyNakedSingles(Grid& grid) {
   int placements = 0;
   for (int row = 0; row < kGridSize; ++row) {

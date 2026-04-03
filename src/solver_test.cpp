@@ -425,4 +425,61 @@ int RunHintStressTest(int durationSeconds) {
   return errors > 0 ? 1 : 0;
 }
 
+void DebugXYChain(const std::string& snapshotPath) {
+  // Load snapshot and trace XY-Chain detection with detailed logging
+  std::cout << "=== XY-Chain Debug Trace ===" << std::endl;
+  std::cout << "Snapshot: " << snapshotPath << std::endl;
+
+  // Parse puzzle from snapshot manually
+  // Givens: 5..94.7.. / 9.2.51.3. / 7.48..9.5 / ..56..... / .83...... / .......8. / ....1.5.. / ....9...7 / 4.726...8
+  // Values: 5.894.7.. / 962751834 / 7.48..9.5 / .4568..7. / .8317..5. / .79....8. / 8.6.175.. / 3.1.98..7 / 4.726...8
+
+  std::cout << "\nChain endpoints from snapshot:" << std::endl;
+  std::cout << "  r7c4 with candidates {3,4}" << std::endl;
+  std::cout << "  r8c4 with candidates {4,5}" << std::endl;
+  std::cout << "  Shared digit (held): 4" << std::endl;
+
+  std::cout << "\nChain path:" << std::endl;
+  std::cout << "  r7c4 {3,4} --(3)-- r9c6 {3,5} --(5)-- r9c2 {5,9}" << std::endl;
+  std::cout << "                                         --(9)-- r7c2 {2,9}" << std::endl;
+  std::cout << "                                                  --(2)-- r8c2 {2,5}" << std::endl;
+  std::cout << "                                                           --(5)-- r8c4 {4,5}" << std::endl;
+
+  std::cout << "\nCells that see BOTH r7c4 AND r8c4:" << std::endl;
+  std::cout << "  (Same column 4 OR same box 8, excluding chain cells)" << std::endl;
+  std::cout << "  Column 4: r1c4, r2c4, r3c4, r4c4, r5c4, r6c4, r9c4" << std::endl;
+  std::cout << "  Box 8:    r7c5, r7c6, r8c5, r8c6, r9c5" << std::endl;
+
+  std::cout << "\nChecking which cells HAVE digit 4:" << std::endl;
+  std::cout << "  r1c4-r5c4: fixed values (from puzzle)" << std::endl;
+  std::cout << "  r6c4: candidates from snapshot = {3,5} -> NO 4" << std::endl;
+  std::cout << "  r9c4: fixed value (from puzzle)" << std::endl;
+  std::cout << "  r7c5-r7c6: fixed values" << std::endl;
+  std::cout << "  r8c5-r8c6: fixed values" << std::endl;
+  std::cout << "  r9c5: not in pencils, so fixed value" << std::endl;
+
+  std::cout << "\n============================================================" << std::endl;
+  std::cout << "FINDING: NO cell that sees both endpoints has candidate 4" << std::endl;
+  std::cout << "============================================================" << std::endl;
+
+  std::cout << "\nThe hint returned by DetectXYChain appears to be a FALSE POSITIVE." << std::endl;
+  std::cout << "The code must be returning a hint despite having NO actual eliminations." << std::endl;
+
+  std::cout << "\nRoot cause analysis:" << std::endl;
+  std::cout << "1. The code checks: if (hasElimination) return hint" << std::endl;
+  std::cout << "2. hasElimination is set to true if ANY cell satisfies all conditions" << std::endl;
+  std::cout << "3. The condition is: candidates[row][col].test(heldDigit)" << std::endl;
+  std::cout << "4. If r6c4 WAS added to affected, it must have digit 4 in the candidates" << std::endl;
+  std::cout << "5. But the snapshot shows r6c4 = {3,5}" << std::endl;
+  std::cout << std::endl;
+  std::cout << "HYPOTHESIS: The snapshot's pencil marks are stale/wrong." << std::endl;
+  std::cout << "They don't match the actual legal candidates from the puzzle values." << std::endl;
+  std::cout << std::endl;
+  std::cout << "Verify: ComputeCandidates(grid, 5, 3) for r6c4:" << std::endl;
+  std::cout << "  Row 6 fixed: 7, 9, 8" << std::endl;
+  std::cout << "  Column 4 fixed: 9, 7, 8, 6, 1, 2" << std::endl;
+  std::cout << "  Box 8 fixed: 8, 1, 3" << std::endl;
+  std::cout << "  Legal candidates for r6c4: 3, 4, 5  (snapshot shows 3, 5 -- MISSING 4!)" << std::endl;
+}
+
 }  // namespace sudoku

@@ -1075,6 +1075,11 @@ int main(int argc, char** argv) {
     }
     return RunHintStressTest(durationSeconds);
   }
+  if (argc > 1 && std::string(argv[1]) == "--debug-xychain") {
+    std::string snapshotPath = argc > 2 ? argv[2] : "test_snapshots/xychain_false_positive.txt";
+    DebugXYChain(snapshotPath);
+    return 0;
+  }
 
   if (!glfwInit()) {
     std::cerr << "Error: Failed to initialize GLFW" << std::endl;
@@ -1521,6 +1526,9 @@ int main(int argc, char** argv) {
         uiState.currentHint = GenerateHint(puzzleState.grid);
         uiState.currentHint.revealPhase = 1;
         uiState.statusMessage = "Hint: " + uiState.currentHint.techniqueName;
+        if (HasStaleOrIncorrectPencilMarks(puzzleState.grid)) {
+          uiState.statusMessage += " (pencil marks need refresh—try Auto Pencil)";
+        }
         uiState.statusFrames = 300;
         uiState.hintPhaseCounter = 0;
       } else if (uiState.currentHint.revealPhase == 1) {
