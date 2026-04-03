@@ -53,6 +53,7 @@ add_executable(sudoku_ui
   src/ui_helpers.cpp
   src/snapshot_io.cpp
   src/help_viewer.cpp
+  src/solver_test.cpp
 )
 target_link_libraries(sudoku_ui PRIVATE imgui_lib)
 

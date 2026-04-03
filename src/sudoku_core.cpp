@@ -57,4 +57,30 @@ Difficulty ParseDifficulty(const char* diffStr) {
   return Difficulty::kHard;
 }
 
+bool IsSolved(const Grid& grid) {
+  for (int r = 0; r < kGridSize; ++r) {
+    for (int c = 0; c < kGridSize; ++c) {
+      const int value = grid[r][c].value;
+      if (value == 0 || IsConflict(grid, r, c, value)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+const DifficultyBand* GetDifficultyBands() {
+  static const DifficultyBand bands[] = {
+    {Difficulty::kSimple, 0, 12},
+    {Difficulty::kEasy, 8, 30},
+    {Difficulty::kMild, 22, 80},
+    {Difficulty::kModerate, 60, 200},
+    {Difficulty::kHard, 150, 500},
+    {Difficulty::kVeryHard, 400, 1200},
+    {Difficulty::kFiendish, 900, 3000},
+    {Difficulty::kDiabolical, 2000, 100000},
+  };
+  return bands;
+}
+
 }  // namespace sudoku

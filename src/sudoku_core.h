@@ -33,6 +33,16 @@ enum class Difficulty {
   kDiabolical,
 };
 
+struct DifficultyBand {
+  Difficulty difficulty;
+  int scoreMin;
+  int scoreMax;
+};
+
+// Get difficulty bands table
+const DifficultyBand* GetDifficultyBands();
+constexpr int GetDifficultyBandCount() { return 8; }
+
 // Convert InputMode and Difficulty enums to display strings
 const char* ModeName(InputMode mode);
 const char* DifficultyName(Difficulty difficulty);
@@ -102,6 +112,8 @@ bool ComputeSolutionFromGivens(const Puzzle& givens, Puzzle& solution);
 // True if two coordinates share row, column, or box.
 bool SharesUnit(int r1, int c1, int r2, int c2);
 bool IsConflict(const Grid& grid, int row, int col, int value);
+// True if grid is completely solved with no conflicts.
+bool IsSolved(const Grid& grid);
 // Computes legal candidates from solved values, independent of visible pencil marks.
 std::bitset<9> ComputeCandidates(const Grid& grid, int row, int col);
 // Clears the placed digit from all unsolved peers in row/column/box.

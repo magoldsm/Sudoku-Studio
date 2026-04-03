@@ -21,6 +21,7 @@
 #include "hints_solver.h"
 #include "imgui.h"
 #include "snapshot_io.h"
+#include "solver_test.h"
 #include "sudoku_core.h"
 #include "ui_constants.h"
 #include "ui_helpers.h"
@@ -453,53 +454,18 @@ Puzzle GeneratePuzzleWithDifficulty(std::mt19937& rng, Difficulty difficulty) {
   constexpr int kNumThreads = 6;  // Performance cores only
 
   int targetMinClues = 24;
+  targetMinClues = 17;
+
+  // Map difficulty to required score ranges using the centralized table
   int targetScoreMin = 0;
   int targetScoreMax = 1000;
-
-  // Map difficulty to required score ranges
-  // New scoring: Naked Single=1, Hidden Single=3, Pointing Pair=10, Box/Line=10,
-  // Naked Pair=15, Hidden Pair=20, Naked Triple=30, Hidden Triple=40
-  switch (difficulty) {
-    case Difficulty::kSimple:
-      targetMinClues = 17;
-      targetScoreMin = 0;
-      targetScoreMax = 12;
+  const DifficultyBand* bands = GetDifficultyBands();
+  for (int i = 0; i < GetDifficultyBandCount(); ++i) {
+    if (bands[i].difficulty == difficulty) {
+      targetScoreMin = bands[i].scoreMin;
+      targetScoreMax = bands[i].scoreMax;
       break;
-    case Difficulty::kEasy:
-      targetMinClues = 17;
-      targetScoreMin = 8;
-      targetScoreMax = 30;
-      break;
-    case Difficulty::kMild:
-      targetMinClues = 17;
-      targetScoreMin = 22;
-      targetScoreMax = 80;
-      break;
-    case Difficulty::kModerate:
-      targetMinClues = 17;
-      targetScoreMin = 60;
-      targetScoreMax = 200;
-      break;
-    case Difficulty::kHard:
-      targetMinClues = 17;
-      targetScoreMin = 150;
-      targetScoreMax = 500;
-      break;
-    case Difficulty::kVeryHard:
-      targetMinClues = 17;
-      targetScoreMin = 400;
-      targetScoreMax = 1200;
-      break;
-    case Difficulty::kFiendish:
-      targetMinClues = 17;
-      targetScoreMin = 900;
-      targetScoreMax = 3000;
-      break;
-    case Difficulty::kDiabolical:
-      targetMinClues = 17;
-      targetScoreMin = 2000;
-      targetScoreMax = 100000;
-      break;
+    }
   }
 
   std::atomic<bool> puzzleFound{false};
@@ -748,18 +714,6 @@ void RemoveDigitFromPeerPencils(Grid& grid, int row, int col, int digit) {
   }
 }
 
-bool IsSolved(const Grid& grid) {
-  for (int r = 0; r < kGridSize; ++r) {
-    for (int c = 0; c < kGridSize; ++c) {
-      const int value = grid[r][c].value;
-      if (value == 0 || IsConflict(grid, r, c, value)) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
 std::bitset<9> ComputeCandidates(const Grid& grid, int row, int col) {
   std::bitset<9> candidates;
   if (grid[row][col].value != 0) {
@@ -793,25 +747,46 @@ void ConfigureStyle() {
   style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.65f, 0.57f, 0.48f, 1.0f);
 }
 
-void DrawBoard(Grid& grid,
-               int& selectedRow,
-               int& selectedCol,
-               int highlightDigit,
-               InputMode& mode,
-               int& activeColor,
-               bool highlightPairs,
-               bool showWrongEntrySlash,
-               const Puzzle* solution,
-               bool hasSolution,
-               std::vector<Grid>& undoHistory,
+// Helper function to completely clear the current hint state
+inline void ClearHint(UIState& uiState) {
+  uiState.currentHint.techniqueName.clear();
+  uiState.currentHint.affectedCells.clear();
+  uiState.currentHint.involvedDigits.clear();
+  uiState.currentHint.chainEndpoints.clear();
+  uiState.currentHint.chainCells.clear();
+  uiState.currentHint.revealPhase = 0;
+  uiState.statusMessage.clear();
+  uiState.statusFrames = 0;
+}
+
+// Helper to apply a solver action with undo/status handling
+template<typename SolverFunc>
+inline void ApplySolverAction(UIState& uiState,
+                              PuzzleState& puzzleState,
+                              SolverFunc solverFunc,
+                              const std::string& successPrefix,
+                              const std::string& successSuffix,
+                              const std::string& failMessage,
+                              int statusFrames) {
+  uiState.mode = InputMode::kDigit;
+  const Grid previous = puzzleState.grid;
+  const int result = solverFunc(puzzleState.grid);
+  ClearHint(uiState);
+  if (result > 0) {
+    PushUndoState(uiState.undoHistory, previous);
+    uiState.statusMessage = successPrefix + std::to_string(result) + successSuffix;
+  } else {
+    uiState.statusMessage = failMessage;
+  }
+  uiState.statusFrames = statusFrames;
+}
+
+void DrawBoard(UIState& uiState,
+               PuzzleState& puzzleState,
                bool solved,
-               Hint& hint,
-               std::string& statusMessage,
-               int& statusFrames,
+               int highlightDigit,
                ImFont* digitFont,
-               ImFont* noteFont,
-               int& showPositionDigit,
-               int& showEffectDigit) {
+               ImFont* noteFont) {
   ImGui::BeginChild("BoardArea", ImVec2(kBoardSize + 12.0f, kBoardSize + 18.0f), true,
                     ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar);
 
@@ -834,7 +809,7 @@ void DrawBoard(Grid& grid,
 
     // Detect double-click in color mode
     const float currentTime = ImGui::GetTime();
-    const bool isDoubleClick = (mode == InputMode::kColor &&
+    const bool isDoubleClick = (uiState.mode == InputMode::kColor &&
                                 lastClickedRow == clampedRow &&
                                 lastClickedCol == clampedCol &&
                                 (currentTime - lastClickTime) < kDoubleClickThreshold);
@@ -844,64 +819,40 @@ void DrawBoard(Grid& grid,
     lastClickTime = currentTime;
 
     // In color mode: single-click to apply color, double-click to remove
-    if (mode == InputMode::kColor) {
-      Cell& clickedCell = grid[clampedRow][clampedCol];
+    if (uiState.mode == InputMode::kColor) {
+      Cell& clickedCell = puzzleState.grid[clampedRow][clampedCol];
       if (isDoubleClick) {
         // Double-click: remove color
         if (clickedCell.colorTag != 0) {
-          PushUndoState(undoHistory, grid);
+          PushUndoState(uiState.undoHistory, puzzleState.grid);
           clickedCell.colorTag = 0;
-          // Clear hint when color is modified via mouse click
-          hint.techniqueName.clear();
-          hint.affectedCells.clear();
-          hint.involvedDigits.clear();
-          hint.chainEndpoints.clear();
-          hint.chainCells.clear();
-          hint.revealPhase = 0;
-          statusMessage.clear();
-          statusFrames = 0;
+          ClearHint(uiState);
         }
       } else {
         // Single-click: apply color (don't select the cell)
-        if (clickedCell.colorTag != activeColor) {
-          PushUndoState(undoHistory, grid);
-          clickedCell.colorTag = activeColor;
-          // Clear hint when color is modified via mouse click
-          hint.techniqueName.clear();
-          hint.affectedCells.clear();
-          hint.involvedDigits.clear();
-          hint.chainEndpoints.clear();
-          hint.chainCells.clear();
-          hint.revealPhase = 0;
-          statusMessage.clear();
-          statusFrames = 0;
+        if (clickedCell.colorTag != uiState.activeColor) {
+          PushUndoState(uiState.undoHistory, puzzleState.grid);
+          clickedCell.colorTag = uiState.activeColor;
+          ClearHint(uiState);
         }
       }
       // Don't select the cell in color mode
     } else {
       // Non-color modes: always select the cell
-      selectedCol = clampedCol;
-      selectedRow = clampedRow;
+      uiState.selectedCol = clampedCol;
+      uiState.selectedRow = clampedRow;
 
-      Cell& clickedCell = grid[selectedRow][selectedCol];
-      if (mode == InputMode::kPencil && !clickedCell.fixed && clickedCell.value == 0) {
+      Cell& clickedCell = puzzleState.grid[uiState.selectedRow][uiState.selectedCol];
+      if (uiState.mode == InputMode::kPencil && !clickedCell.fixed && clickedCell.value == 0) {
         const float localX = mouse.x - (origin.x + static_cast<float>(clickedCol) * kCellSize);
         const float localY = mouse.y - (origin.y + static_cast<float>(clickedRow) * kCellSize);
         const int subCol = std::clamp(static_cast<int>((localX / kCellSize) * 3.0f), 0, 2);
         const int subRow = std::clamp(static_cast<int>((localY / kCellSize) * 3.0f), 0, 2);
         const int markDigit = subRow * 3 + subCol + 1;
         if (clickedCell.pencil.test(markDigit - 1)) {
-          PushUndoState(undoHistory, grid);
+          PushUndoState(uiState.undoHistory, puzzleState.grid);
           clickedCell.pencil.reset(markDigit - 1);
-          // Clear hint when pencil mark is modified via mouse click
-          hint.techniqueName.clear();
-          hint.affectedCells.clear();
-          hint.involvedDigits.clear();
-          hint.chainEndpoints.clear();
-          hint.chainCells.clear();
-          hint.revealPhase = 0;
-          statusMessage.clear();
-          statusFrames = 0;
+          ClearHint(uiState);
         }
       }
     }
@@ -913,51 +864,51 @@ void DrawBoard(Grid& grid,
     for (int c = 0; c < kGridSize; ++c) {
       const ImVec2 cellMin(origin.x + c * kCellSize, origin.y + r * kCellSize);
       const ImVec2 cellMax(cellMin.x + kCellSize, cellMin.y + kCellSize);
-      const bool hintCellActive = hint.revealPhase >= 2 && ContainsCell(hint.affectedCells, r, c);
+      const bool hintCellActive = uiState.currentHint.revealPhase >= 2 && ContainsCell(uiState.currentHint.affectedCells, r, c);
 
       ImU32 fill = kCellBackgroundColor;
-      if (SharesUnit(r, c, selectedRow, selectedCol)) {
+      if (SharesUnit(r, c, uiState.selectedRow, uiState.selectedCol)) {
         fill = kCellHoveredColor;
       }
-      if (grid[r][c].colorTag > 0) {
-        fill = kTagColors[grid[r][c].colorTag];
+      if (puzzleState.grid[r][c].colorTag > 0) {
+        fill = kTagColors[puzzleState.grid[r][c].colorTag];
       }
-      const int chainIndex = (hint.revealPhase >= 2) ? hint.ChainIndex(r, c) : -1;
+      const int chainIndex = (uiState.currentHint.revealPhase >= 2) ? uiState.currentHint.ChainIndex(r, c) : -1;
       if (chainIndex >= 0) {
         // Chain cells get alternating colors (priority over general hint color)
         fill = (chainIndex % 2 == 0) ? kChainAlternateColorA : kChainAlternateColorB;
       } else if (hintCellActive) {
         // Elimination-target cells: use a warm amber when chain cells are also
         // present so targets stand out clearly from the blue/green chain cells.
-        fill = hint.chainCells.empty() ? kCellHintColor : kCellHintEliminationColor;
+        fill = uiState.currentHint.chainCells.empty() ? kCellHintColor : kCellHintEliminationColor;
       }
-      if (r == selectedRow && c == selectedCol) {
+      if (r == uiState.selectedRow && c == uiState.selectedCol) {
         fill = kCellSelectedColor;
       }
 
       draw->AddRectFilled(cellMin, cellMax, fill);
 
-      const int value = grid[r][c].value;
-      if (hint.revealPhase >= 3 && hintCellActive && value != 0 && hint.IncludesDigit(value)) {
+      const int value = puzzleState.grid[r][c].value;
+      if (uiState.currentHint.revealPhase >= 3 && hintCellActive && value != 0 && uiState.currentHint.IncludesDigit(value)) {
         draw->AddRect(ImVec2(cellMin.x + kCellEdgeInset, cellMin.y + kCellEdgeInset),
                       ImVec2(cellMax.x - kCellEdgeInset, cellMax.y - kCellEdgeInset),
                       kHintDigitHighlightColor, kCellBorderRadius, 0, kCellBorderThickness);
       }
-      if (hint.revealPhase >= 2 && hint.IsChainEnd(r, c)) {
+      if (uiState.currentHint.revealPhase >= 2 && uiState.currentHint.IsChainEnd(r, c)) {
         draw->AddRect(ImVec2(cellMin.x + 1.0f, cellMin.y + 1.0f),
                       ImVec2(cellMax.x - 1.0f, cellMax.y - 1.0f),
                       kChainEndpointBorderColor, kChainEndpointBorderRadius, 0,
                       kChainEndpointBorderThickness);
       }
-      if (highlightDigit != 0 && value == highlightDigit && !highlightPairs) {
+      if (highlightDigit != 0 && value == highlightDigit && !uiState.highlightPairs) {
         const ImVec2 center(cellMin.x + kCellSize * 0.5f, cellMin.y + kCellSize * 0.5f);
         draw->AddCircleFilled(center, kCellSize * kCircleRadiusFactor, kPencilHighlightBackgroundColor);
       }
       if (value != 0) {
-        ImU32 textColor = grid[r][c].fixed ? kFixedDigitColor : kUserDigitColor;
-        const bool hasConflict = IsConflict(grid, r, c, value);
+        ImU32 textColor = puzzleState.grid[r][c].fixed ? kFixedDigitColor : kUserDigitColor;
+        const bool hasConflict = IsConflict(puzzleState.grid, r, c, value);
         const bool wrongBySolution =
-            hasSolution && solution != nullptr && !grid[r][c].fixed && value != (*solution)[r][c];
+            puzzleState.hasSolution && !puzzleState.grid[r][c].fixed && value != puzzleState.solution[r][c];
         if (hasConflict || wrongBySolution) {
           textColor = kConflictDigitColor;
         }
@@ -973,7 +924,7 @@ void DrawBoard(Grid& grid,
                       textColor,
                       text.c_str());
 
-        if (showWrongEntrySlash && !grid[r][c].fixed && (hasConflict || wrongBySolution)) {
+        if (uiState.showWrongEntrySlash && !puzzleState.grid[r][c].fixed && (hasConflict || wrongBySolution)) {
           draw->AddLine(ImVec2(cellMin.x + 8.0f, cellMax.y - 8.0f),
                         ImVec2(cellMax.x - 8.0f, cellMin.y + 8.0f),
                         IM_COL32(220, 40, 40, 255), 4.0f);
@@ -982,7 +933,7 @@ void DrawBoard(Grid& grid,
       }
 
       for (int d = 1; d <= 9; ++d) {
-        if (!grid[r][c].pencil.test(d - 1)) {
+        if (!puzzleState.grid[r][c].pencil.test(d - 1)) {
           continue;
         }
         const int slotR = (d - 1) / 3;
@@ -994,12 +945,12 @@ void DrawBoard(Grid& grid,
 
         const ImVec2 noteSize =
             noteFont->CalcTextSizeA(noteFont->FontSize, FLT_MAX, 0.0f, text.c_str());
-        if (highlightDigit == d || (highlightPairs && grid[r][c].pencil.count() == 2)) {
+        if (highlightDigit == d || (uiState.highlightPairs && puzzleState.grid[r][c].pencil.count() == 2)) {
           draw->AddRectFilled(ImVec2(notePos.x - 2.0f, notePos.y - 1.0f),
                               ImVec2(notePos.x + noteSize.x + 2.0f, notePos.y + noteSize.y + 1.0f),
                               kPencilHighlightBackgroundColor, kPencilMarkBorderRadius);
         }
-        if (hint.revealPhase >= 3 && hintCellActive && hint.IncludesDigit(d)) {
+        if (uiState.currentHint.revealPhase >= 3 && hintCellActive && uiState.currentHint.IncludesDigit(d)) {
           draw->AddRect(ImVec2(notePos.x - 3.0f, notePos.y - 2.0f),
                         ImVec2(notePos.x + noteSize.x + 3.0f, notePos.y + noteSize.y + 2.0f),
                         kHintDigitHighlightColor, kPencilMarkBorderRadius, 0, kPencilMarkBorderThickness);
@@ -1015,24 +966,24 @@ void DrawBoard(Grid& grid,
   }
 
   // --- SHOW EFFECT SLASHES (for impossible cells) ---
-  if (showEffectDigit != 0) {
+  if (uiState.showEffectDigit != 0) {
     constexpr ImU32 slashColor = IM_COL32(30, 100, 210, 255);  // Blue
     constexpr float slashThickness = 3.0f;
 
     for (int r = 0; r < kGridSize; ++r) {
       for (int c = 0; c < kGridSize; ++c) {
         // Only show slashes in empty cells (value == 0) with pencil marks
-        if (grid[r][c].value != 0) {
+        if (puzzleState.grid[r][c].value != 0) {
           continue;  // Skip cells with values
         }
 
         // Check if the digit is impossible (appears in same row/column/box)
-        const int digit = showEffectDigit;
+        const int digit = uiState.showEffectDigit;
         bool isImpossible = false;
 
         // Check row
         for (int cc = 0; cc < kGridSize; ++cc) {
-          if (grid[r][cc].value == digit) {
+          if (puzzleState.grid[r][cc].value == digit) {
             isImpossible = true;
             break;
           }
@@ -1041,7 +992,7 @@ void DrawBoard(Grid& grid,
         // Check column
         if (!isImpossible) {
           for (int rr = 0; rr < kGridSize; ++rr) {
-            if (grid[rr][c].value == digit) {
+            if (puzzleState.grid[rr][c].value == digit) {
               isImpossible = true;
               break;
             }
@@ -1054,7 +1005,7 @@ void DrawBoard(Grid& grid,
           const int boxC = (c / 3) * 3;
           for (int rr = boxR; rr < boxR + 3; ++rr) {
             for (int cc = boxC; cc < boxC + 3; ++cc) {
-              if (grid[rr][cc].value == digit) {
+              if (puzzleState.grid[rr][cc].value == digit) {
                 isImpossible = true;
                 break;
               }
@@ -1064,7 +1015,7 @@ void DrawBoard(Grid& grid,
         }
 
         // Draw slash if digit is impossible and cell has pencil marks or is empty
-        if (isImpossible && (grid[r][c].pencil.count() > 0 || grid[r][c].value == 0)) {
+        if (isImpossible && (puzzleState.grid[r][c].pencil.count() > 0 || puzzleState.grid[r][c].value == 0)) {
           const ImVec2 cellMin(origin.x + c * kCellSize, origin.y + r * kCellSize);
           const ImVec2 cellMax(cellMin.x + kCellSize, cellMin.y + kCellSize);
           draw->AddLine(ImVec2(cellMin.x + 8.0f, cellMax.y - 8.0f),
@@ -1080,439 +1031,12 @@ void DrawBoard(Grid& grid,
   ImGui::EndChild();
 
   ImGui::SameLine(0.0f, kBoardPanelMargin);
-  DrawColorTagPanel(grid, activeColor, mode, kTagColors, showPositionDigit, showEffectDigit, highlightPairs);
+  DrawColorTagPanel(puzzleState.grid, uiState.activeColor, uiState.mode, kTagColors, uiState.showPositionDigit, uiState.showEffectDigit, uiState.highlightPairs);
 }
 
 }  // namespace sudoku
 
 using namespace sudoku;
-
-// Solve a puzzle with detailed logging of techniques attempted
-int CountUnsolvedCells(const Grid& grid) {
-  int count = 0;
-  for (int r = 0; r < kGridSize; ++r) {
-    for (int c = 0; c < kGridSize; ++c) {
-      if (grid[r][c].value == 0) count++;
-    }
-  }
-  return count;
-}
-
-std::string SolveWithLogging(Puzzle puzzle) {
-  Grid grid = BuildGrid(puzzle);
-  ApplyAutoPencil(grid);
-
-  std::vector<const char*> appliedTechniques;
-  constexpr int kMaxIterations = 200;
-
-  for (int i = 0; i < kMaxIterations; ++i) {
-    bool changed = false;
-
-    // Exhaust each technique completely before moving to the next
-    while (ApplyNakedSingles(grid) > 0) {
-      appliedTechniques.push_back("Naked Singles");
-      changed = true;
-    }
-
-    while (ApplyHiddenSingles(grid) > 0) {
-      appliedTechniques.push_back("Hidden Singles");
-      changed = true;
-    }
-
-    while (ApplyPointingPairs(grid) > 0) {
-      appliedTechniques.push_back("Pointing Pairs");
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    while (ApplyBoxLineReduction(grid) > 0) {
-      appliedTechniques.push_back("Box/Line Reduction");
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    while (ApplyNakedPairs(grid) > 0) {
-      appliedTechniques.push_back("Naked Pairs");
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    while (ApplyHiddenPairs(grid) > 0) {
-      appliedTechniques.push_back("Hidden Pairs");
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    while (ApplyNakedTriples(grid) > 0) {
-      appliedTechniques.push_back("Naked Triples");
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    while (ApplyHiddenTriples(grid) > 0) {
-      appliedTechniques.push_back("Hidden Triples");
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    while (ApplyNakedQuads(grid) > 0) {
-      appliedTechniques.push_back("Naked Quads");
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    while (ApplyHiddenQuads(grid) > 0) {
-      appliedTechniques.push_back("Hidden Quads");
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    while (ApplyBlockBlockInteraction(grid) > 0) {
-      appliedTechniques.push_back("Block/Block");
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    while (ApplyXWing(grid) > 0) {
-      appliedTechniques.push_back("X-Wing");
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    while (ApplyUniqueRectangle(grid) > 0) {
-      appliedTechniques.push_back("Unique Rectangle");
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    while (ApplyYWing(grid) > 0) {
-      appliedTechniques.push_back("Y-Wing");
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    while (ApplySimpleColoring(grid) > 0) {
-      appliedTechniques.push_back("Simple Colouring");
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    while (ApplySwordfish(grid) > 0) {
-      appliedTechniques.push_back("Swordfish");
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    while (ApplyXYZWing(grid) > 0) {
-      appliedTechniques.push_back("XYZ-Wing");
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    while (ApplyXYChain(grid) > 0) {
-      appliedTechniques.push_back("XY-Chain");
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    while (ApplyJellyfish(grid) > 0) {
-      appliedTechniques.push_back("Jellyfish");
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    while (ApplyForcingChains(grid) > 0) {
-      appliedTechniques.push_back("Forcing Chains");
-      while (ApplyNakedSingles(grid) > 0 || ApplyHiddenSingles(grid) > 0) {
-        // Keep propagating
-      }
-      changed = true;
-    }
-
-    if (!changed) break;
-  }
-
-  int remaining = CountUnsolvedCells(grid);
-  std::string result;
-
-  if (remaining == 0) {
-    result = "OK";
-  } else {
-    result = "STUCK at " + std::to_string(remaining) + " cells";
-  }
-
-  // Add technique log
-  if (!appliedTechniques.empty()) {
-    result += " | Techniques: ";
-    for (size_t i = 0; i < appliedTechniques.size(); ++i) {
-      if (i > 0) result += ", ";
-      result += appliedTechniques[i];
-    }
-  } else {
-    result += " | No techniques applied";
-  }
-
-  return result;
-}
-
-int TestGenerationAndSolving() {
-  std::cerr << "\n=== Puzzle Generation and Solving Test ===\n" << std::endl;
-
-  std::random_device rd;
-  std::mt19937 rng(rd());
-
-  struct DifficultyTest {
-    Difficulty difficulty;
-    const char* name;
-    int targetScoreMin, targetScoreMax;
-    int puzzlesToTest;
-  };
-
-  const DifficultyTest tests[] = {
-      {Difficulty::kSimple, "Simple", 0, 12, 3},
-      {Difficulty::kEasy, "Easy", 8, 30, 3},
-      {Difficulty::kMild, "Mild", 22, 80, 3},
-      {Difficulty::kModerate, "Moderate", 60, 200, 3},
-      {Difficulty::kHard, "Hard", 150, 500, 3},
-      {Difficulty::kVeryHard, "Very Hard", 400, 1200, 2},
-      {Difficulty::kFiendish, "Fiendish", 900, 3000, 2},
-      {Difficulty::kDiabolical, "Diabolical", 2000, 100000, 1},
-  };
-
-  int totalGenerated = 0, totalSolved = 0, totalScoreMatches = 0, totalFailures = 0;
-
-  for (const auto& test : tests) {
-    std::cerr << "\n[" << test.name << "] Band: " << test.targetScoreMin << "-" << test.targetScoreMax << std::endl;
-
-    for (int i = 0; i < test.puzzlesToTest; ++i) {
-      Puzzle puzzle = GeneratePuzzleWithDifficulty(rng, test.difficulty);
-      bool isEmpty = true;
-      for (int r = 0; r < kGridSize && isEmpty; ++r) {
-        for (int c = 0; c < kGridSize && isEmpty; ++c) {
-          if (puzzle[r][c] != 0) isEmpty = false;
-        }
-      }
-      if (isEmpty) {
-        std::cerr << "  FAIL: Generation returned empty puzzle" << std::endl;
-        totalFailures++;
-        continue;
-      }
-      totalGenerated++;
-
-      // Check solver can complete it with detailed logging
-      std::string solveResult = SolveWithLogging(puzzle);
-      if (solveResult.find("OK") != 0) {
-        std::cerr << "  FAIL: " << solveResult << std::endl;
-        totalFailures++;
-        continue;
-      }
-      std::cerr << "  PASS: " << solveResult << std::endl;
-      totalSolved++;
-
-      // Check score
-      int score = SolveAndScore(puzzle);
-      if (score < test.targetScoreMin || score > test.targetScoreMax) {
-        std::cerr << "    Score " << score << " outside band [" << test.targetScoreMin << ","
-                  << test.targetScoreMax << "]" << std::endl;
-      } else {
-        totalScoreMatches++;
-      }
-    }
-  }
-
-  std::cerr << "\n=== Test Summary ===" << std::endl;
-  std::cerr << "Generated: " << totalGenerated << std::endl;
-  std::cerr << "Solved: " << totalSolved << " (" << (100 * totalSolved / (totalGenerated + 1)) << "%)" << std::endl;
-  std::cerr << "Scores in band: " << totalScoreMatches << " (" << (100 * totalScoreMatches / (totalGenerated + 1))
-            << "%)" << std::endl;
-  std::cerr << "Failures: " << totalFailures << std::endl;
-
-  return totalFailures > 0 ? 1 : 0;
-}
-
-int RunHintStressTest(int durationSeconds) {
-  std::cerr << "\n=== Hint System Stress Test ===" << std::endl;
-  if (durationSeconds > 0) {
-    std::cerr << "Running for " << durationSeconds << " seconds..." << std::endl;
-  } else {
-    std::cerr << "Running indefinitely (Ctrl+C to stop)..." << std::endl;
-  }
-
-  std::random_device rd;
-  std::mt19937 rng(rd());
-  std::uniform_int_distribution<int> difficultyDist(0, 7);
-
-  auto startTime = std::chrono::steady_clock::now();
-  int puzzlesCompleted = 0;
-  int totalHints = 0;
-  int errors = 0;
-
-  while (true) {
-    // Check time limit
-    if (durationSeconds > 0) {
-      auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
-          std::chrono::steady_clock::now() - startTime)
-          .count();
-      if (elapsed >= durationSeconds) break;
-    }
-
-    // Generate puzzle at random difficulty
-    Difficulty diff = static_cast<Difficulty>(difficultyDist(rng));
-    Puzzle puzzle = GeneratePuzzleWithDifficulty(rng, diff);
-
-    // Check puzzle is solvable
-    Puzzle testPuzzle = puzzle;
-    if (!SolveComprehensive(testPuzzle)) {
-      std::cerr << "ERROR: Generated puzzle is not solvable!" << std::endl;
-      errors++;
-      continue;
-    }
-
-    // Initialize grid from puzzle values
-    Grid grid = BuildGrid(puzzle);
-
-    // Use ApplyAutoPencil to properly initialize candidates (same as UI)
-    ApplyAutoPencil(grid);
-
-    // Now solve using hints
-    int hintCount = 0;
-    while (!IsSolved(grid)) {
-      Hint hint = GenerateHint(grid);
-
-      if (hint.techniqueName.empty() || hint.techniqueName == "No supported Sadman hint available") {
-        // Check if puzzle is actually solved
-        if (!IsSolved(grid)) {
-          std::cerr << "STUCK: No hint available but puzzle not solved after " << hintCount << " hints" << std::endl;
-
-          // Diagnostic: what techniques are available?
-          Grid testGrid = grid;
-          bool foundSomething = false;
-
-          if (ApplyNakedSingles(testGrid) > 0) {
-            std::cerr << "  → NakedSingles would work" << std::endl;
-            foundSomething = true;
-          }
-          testGrid = grid;
-          if (ApplyHiddenSingles(testGrid) > 0) {
-            std::cerr << "  → HiddenSingles would work" << std::endl;
-            foundSomething = true;
-          }
-          testGrid = grid;
-          if (ApplyPointingPairs(testGrid) > 0) {
-            std::cerr << "  → PointingPairs would work" << std::endl;
-            foundSomething = true;
-          }
-          testGrid = grid;
-          if (ApplyBoxLineReduction(testGrid) > 0) {
-            std::cerr << "  → BoxLineReduction would work" << std::endl;
-            foundSomething = true;
-          }
-          testGrid = grid;
-          if (ApplyNakedPairs(testGrid) > 0) {
-            std::cerr << "  → NakedPairs would work" << std::endl;
-            foundSomething = true;
-          }
-          testGrid = grid;
-          if (ApplyHiddenPairs(testGrid) > 0) {
-            std::cerr << "  → HiddenPairs would work" << std::endl;
-            foundSomething = true;
-          }
-          testGrid = grid;
-          if (ApplyNakedTriples(testGrid) > 0) {
-            std::cerr << "  → NakedTriples would work" << std::endl;
-            foundSomething = true;
-          }
-          testGrid = grid;
-          if (ApplyHiddenTriples(testGrid) > 0) {
-            std::cerr << "  → HiddenTriples would work" << std::endl;
-            foundSomething = true;
-          }
-          testGrid = grid;
-          if (ApplyNakedQuads(testGrid) > 0) {
-            std::cerr << "  → NakedQuads would work" << std::endl;
-            foundSomething = true;
-          }
-          testGrid = grid;
-          if (ApplyHiddenQuads(testGrid) > 0) {
-            std::cerr << "  → HiddenQuads would work" << std::endl;
-            foundSomething = true;
-          }
-
-          if (!foundSomething) {
-            std::cerr << "  → No techniques found (true dead end)" << std::endl;
-          }
-
-          errors++;
-        }
-        break;
-      }
-
-      // Apply hint
-      if (ApplyHint(grid, hint) == 0) {
-        std::cerr << "ERROR: Failed to apply hint: " << hint.techniqueName << std::endl;
-        errors++;
-        break;
-      }
-
-      // Update pencil marks using the same function as UI
-      ApplyAutoPencil(grid);
-
-      hintCount++;
-      totalHints++;
-
-      // Safety check - if we've used way too many hints, something is wrong
-      if (hintCount > 500) {
-        std::cerr << "ERROR: Exceeded 500 hints for single puzzle" << std::endl;
-        errors++;
-        break;
-      }
-    }
-
-    puzzlesCompleted++;
-    if (puzzlesCompleted % 10 == 0) {
-      std::cerr << "Completed " << puzzlesCompleted << " puzzles, " << totalHints
-                << " total hints, " << errors << " errors" << std::endl;
-    }
-  }
-
-  std::cerr << "\n=== Hint Stress Test Results ===" << std::endl;
-  std::cerr << "Puzzles completed: " << puzzlesCompleted << std::endl;
-  std::cerr << "Total hints used: " << totalHints << std::endl;
-  std::cerr << "Average hints per puzzle: "
-            << (puzzlesCompleted > 0 ? (double)totalHints / puzzlesCompleted : 0) << std::endl;
-  std::cerr << "Errors: " << errors << std::endl;
-
-  return errors > 0 ? 1 : 0;
-}
-
-// Helper function to completely clear the current hint state
-inline void ClearHint(UIState& uiState) {
-  uiState.currentHint.techniqueName.clear();
-  uiState.currentHint.affectedCells.clear();
-  uiState.currentHint.involvedDigits.clear();
-  uiState.currentHint.chainEndpoints.clear();
-  uiState.currentHint.chainCells.clear();
-  uiState.currentHint.revealPhase = 0;
-  uiState.statusMessage.clear();
-  uiState.statusFrames = 0;
-}
 
 // Load window icon from PNG file
 void SetWindowIcon(GLFWwindow* window) {
@@ -1992,45 +1516,16 @@ int main(int argc, char** argv) {
       uiState.statusFrames = 200;
     }
     if (requestAutoPencil) {
-      uiState.mode = InputMode::kDigit;  // Exit color mode
-      const Grid previous = puzzleState.grid;
-      const int changed = ApplyAutoPencil(puzzleState.grid);
-      ClearHint(uiState);
-      if (changed > 0) {
-        PushUndoState(uiState.undoHistory, previous);
-      }
-      uiState.statusMessage = "Auto-pencil updated " + std::to_string(changed) + " cells";
-      uiState.statusFrames = 240;
+      ApplySolverAction(uiState, puzzleState, [](Grid& g) { return ApplyAutoPencil(g); },
+                        "Auto-pencil updated ", " cells", "No pencil changes", 240);
     }
     if (requestSolveNakedSingles) {
-      uiState.mode = InputMode::kDigit;  // Exit color mode
-      const Grid previous = puzzleState.grid;
-      const int placed = AutoSolveNakedSingles(puzzleState.grid);
-      ClearHint(uiState);
-      if (placed > 0) {
-        PushUndoState(uiState.undoHistory, previous);
-      }
-      if (placed > 0) {
-        uiState.statusMessage = "Solved " + std::to_string(placed) + " naked singles";
-      } else {
-        uiState.statusMessage = "No naked singles found";
-      }
-      uiState.statusFrames = 300;
+      ApplySolverAction(uiState, puzzleState, [](Grid& g) { return AutoSolveNakedSingles(g); },
+                        "Solved ", " naked singles", "No naked singles found", 300);
     }
     if (requestSolveHiddenSingles) {
-      uiState.mode = InputMode::kDigit;  // Exit color mode
-      const Grid previous = puzzleState.grid;
-      const int placed = AutoSolveHiddenSingles(puzzleState.grid);
-      ClearHint(uiState);
-      if (placed > 0) {
-        PushUndoState(uiState.undoHistory, previous);
-      }
-      if (placed > 0) {
-        uiState.statusMessage = "Solved " + std::to_string(placed) + " hidden singles";
-      } else {
-        uiState.statusMessage = "No hidden singles found";
-      }
-      uiState.statusFrames = 300;
+      ApplySolverAction(uiState, puzzleState, [](Grid& g) { return AutoSolveHiddenSingles(g); },
+                        "Solved ", " hidden singles", "No hidden singles found", 300);
     }
     if (requestHint) {
       uiState.mode = InputMode::kDigit;  // Exit color mode
@@ -2152,11 +1647,7 @@ int main(int argc, char** argv) {
     ImGui::TextColored(ImVec4(0.33f, 0.27f, 0.20f, 1.0f),
                        "Sharp text rendering + menu/toolbar workflow");
 
-    DrawBoard(puzzleState.grid, uiState.selectedRow, uiState.selectedCol, highlightDigit, uiState.mode,
-              uiState.activeColor, uiState.highlightPairs, uiState.showWrongEntrySlash,
-              &puzzleState.solution, puzzleState.hasSolution, uiState.undoHistory, solved,
-              uiState.currentHint, uiState.statusMessage, uiState.statusFrames, digitFont, noteFont,
-              uiState.showPositionDigit, uiState.showEffectDigit);
+    DrawBoard(uiState, puzzleState, solved, highlightDigit, digitFont, noteFont);
 
     // Position Technique Panel to the right of Board/Color Tags (on same row)
     ImGui::SameLine(0.0f, kBoardPanelMargin);

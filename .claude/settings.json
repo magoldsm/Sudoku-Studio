@@ -13,7 +13,8 @@
       "Bash(timeout 10 ./build/sudoku_ui --hint-stress-test 1)",
       "Bash(timeout 20 ./build/sudoku_ui --hint-stress-test 3)",
       "Bash(git checkout:*)",
-      "Bash(timeout 15 ./build/sudoku_ui --hint-stress-test 1)"
+      "Bash(timeout 15 ./build/sudoku_ui --hint-stress-test 1)",
+      "Bash(cmake --build build --config Release)"
     ],
     "additionalDirectories": [
       "/tmp"
