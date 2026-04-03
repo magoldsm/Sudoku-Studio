@@ -21,10 +21,10 @@ RequestExecutionLevel admin
 
 ; Installer sections
 Section "Install"
-  SetOutPath "$INSTDIR"
+  SetOutPath "$INSTDIR\bin"
 
   ; Copy executable
-  File "build\sudoku_ui.exe"
+  File "build\Release\sudoku_ui.exe"
 
   ; Copy help files
   SetOutPath "$INSTDIR\docs\help"
@@ -32,11 +32,11 @@ Section "Install"
 
   ; Create start menu shortcuts
   CreateDirectory "$SMPROGRAMS\Sudoku Studio"
-  CreateShortcut "$SMPROGRAMS\Sudoku Studio\Sudoku Studio.lnk" "$INSTDIR\sudoku_ui.exe"
+  CreateShortcut "$SMPROGRAMS\Sudoku Studio\Sudoku Studio.lnk" "$INSTDIR\bin\sudoku_ui.exe"
   CreateShortcut "$SMPROGRAMS\Sudoku Studio\Uninstall.lnk" "$INSTDIR\uninstall.exe"
 
   ; Create desktop shortcut
-  CreateShortcut "$DESKTOP\Sudoku Studio.lnk" "$INSTDIR\sudoku_ui.exe"
+  CreateShortcut "$DESKTOP\Sudoku Studio.lnk" "$INSTDIR\bin\sudoku_ui.exe"
 
   ; Write uninstaller
   WriteUninstaller "$INSTDIR\uninstall.exe"
@@ -57,7 +57,8 @@ Section "Uninstall"
   Delete "$DESKTOP\Sudoku Studio.lnk"
 
   ; Remove files
-  Delete "$INSTDIR\sudoku_ui.exe"
+  Delete "$INSTDIR\bin\sudoku_ui.exe"
+  RMDir "$INSTDIR\bin"
   RMDir /r "$INSTDIR\docs"
   Delete "$INSTDIR\uninstall.exe"
   RMDir "$INSTDIR"
