@@ -1260,6 +1260,8 @@ int main(int argc, char** argv) {
     bool requestUndo = false;
     bool requestSnapshot = false;
     bool requestLoad = false;
+    bool requestTogglePairs = false;
+    bool requestToggleSlash = false;
 
     if (ImGui::BeginMainMenuBar()) {
       if (ImGui::BeginMenu("File")) {
@@ -1323,14 +1325,10 @@ int main(int argc, char** argv) {
           requestSolveHiddenSingles = true;
         }
         if (ImGui::MenuItem("Highlight Pencil Pairs", "B", uiState.highlightPairs)) {
-          uiState.highlightPairs = !uiState.highlightPairs;
-          uiState.statusMessage = uiState.highlightPairs ? "Pair highlight enabled" : "Pair highlight disabled";
-          uiState.statusFrames = 200;
+          requestTogglePairs = true;
         }
         if (ImGui::MenuItem("Wrong Entry Slash", nullptr, uiState.showWrongEntrySlash)) {
-          uiState.showWrongEntrySlash = !uiState.showWrongEntrySlash;
-          uiState.statusMessage = uiState.showWrongEntrySlash ? "Wrong-entry slash enabled" : "Wrong-entry slash disabled";
-          uiState.statusFrames = 200;
+          requestToggleSlash = true;
         }
         if (ImGui::MenuItem(uiState.currentHint.revealPhase == 3 ? "Apply Hint" : "Hint", "?")) {
           if (uiState.currentHint.revealPhase == 3) requestApplyHint = true;
@@ -1411,15 +1409,11 @@ int main(int argc, char** argv) {
     }
     ImGui::SameLine();
     if (ImGui::Button(uiState.highlightPairs ? "Pairs On" : "Pairs Off", ImVec2(110, 34))) {
-      uiState.highlightPairs = !uiState.highlightPairs;
-      uiState.statusMessage = uiState.highlightPairs ? "Pair highlight enabled" : "Pair highlight disabled";
-      uiState.statusFrames = 200;
+      requestTogglePairs = true;
     }
     ImGui::SameLine();
     if (ImGui::Button(uiState.showWrongEntrySlash ? "Slash On" : "Slash Off", ImVec2(105, 34))) {
-      uiState.showWrongEntrySlash = !uiState.showWrongEntrySlash;
-      uiState.statusMessage = uiState.showWrongEntrySlash ? "Wrong-entry slash enabled" : "Wrong-entry slash disabled";
-      uiState.statusFrames = 200;
+      requestToggleSlash = true;
     }
     ImGui::SameLine();
     const bool hintAtApplyPhase = uiState.currentHint.revealPhase == 3;
@@ -1452,9 +1446,7 @@ int main(int argc, char** argv) {
     }
     if (ImGui::IsKeyPressed(ImGuiKey_B)) {
       uiState.mode = InputMode::kDigit;  // Exit color mode
-      uiState.highlightPairs = !uiState.highlightPairs;
-      uiState.statusMessage = uiState.highlightPairs ? "Pair highlight enabled" : "Pair highlight disabled";
-      uiState.statusFrames = 200;
+      requestTogglePairs = true;
     }
     if (ImGui::IsKeyPressed(ImGuiKey_N)) {
       requestNewPuzzle = true;
@@ -1552,6 +1544,16 @@ int main(int argc, char** argv) {
       uiState.statusMessage = "Applied: " + name;
       uiState.statusFrames = 300;
       ClearHint(uiState);
+    }
+    if (requestTogglePairs) {
+      uiState.highlightPairs = !uiState.highlightPairs;
+      uiState.statusMessage = uiState.highlightPairs ? "Pair highlight enabled" : "Pair highlight disabled";
+      uiState.statusFrames = 200;
+    }
+    if (requestToggleSlash) {
+      uiState.showWrongEntrySlash = !uiState.showWrongEntrySlash;
+      uiState.statusMessage = uiState.showWrongEntrySlash ? "Wrong-entry slash enabled" : "Wrong-entry slash disabled";
+      uiState.statusFrames = 200;
     }
 
     Cell& selected = puzzleState.grid[uiState.selectedRow][uiState.selectedCol];
@@ -1660,19 +1662,15 @@ int main(int argc, char** argv) {
 
     if (solved) {
       ImGui::TextColored(ImVec4(0.18f, 0.53f, 0.31f, 1.0f), "Solved: grid is complete and valid.");
-    } else if (uiState.currentHint.revealPhase > 0 && !uiState.currentHint.techniqueName.empty()) {
-      if (uiState.currentHint.revealPhase == 1) {
-        ImGui::TextColored(ImVec4(0.36f, 0.26f, 0.18f, 1.0f), "Hint: %s",
-                           uiState.currentHint.techniqueName.c_str());
-      } else if (uiState.currentHint.revealPhase == 2) {
-        ImGui::TextColored(ImVec4(0.36f, 0.26f, 0.18f, 1.0f), "Hint: %s (cells highlighted)",
-                           uiState.currentHint.techniqueName.c_str());
-      } else {
-        ImGui::TextColored(ImVec4(0.36f, 0.26f, 0.18f, 1.0f), "Hint: %s (digits highlighted)",
-                           uiState.currentHint.techniqueName.c_str());
-      }
-    } else if (uiState.statusFrames > 0) {
+    } else if (uiState.statusFrames > 0 && !uiState.statusMessage.empty()) {
+      // Show status message with priority (e.g., hint phases, solver actions, toggles)
       ImGui::TextColored(ImVec4(0.36f, 0.26f, 0.18f, 1.0f), "%s", uiState.statusMessage.c_str());
+    } else if (uiState.currentHint.revealPhase > 0 && !uiState.currentHint.techniqueName.empty()) {
+      // Fallback: re-show hint status if message timed out but hint is still active
+      ImGui::TextColored(ImVec4(0.36f, 0.26f, 0.18f, 1.0f), "Hint: %s%s",
+                         uiState.currentHint.techniqueName.c_str(),
+                         uiState.currentHint.revealPhase == 2 ? " (cells highlighted)" :
+                         uiState.currentHint.revealPhase >= 3 ? " (digits highlighted)" : "");
     } else {
       ImGui::TextUnformatted("Hints active: unit, same digit, and matching pencil-mark highlight");
     }
@@ -1778,65 +1776,40 @@ int main(int argc, char** argv) {
       ImGui::Spacing();
 
       const auto& sc = puzzleState.score;
-      if (sc.nakedSingles > 0) {
-        ImGui::Text("Naked Singles:      %3d x   1 = %4d", sc.nakedSingles / 1,   sc.nakedSingles);
-      }
-      if (sc.hiddenSingles > 0) {
-        ImGui::Text("Hidden Singles:     %3d x   3 = %4d", sc.hiddenSingles / 3,  sc.hiddenSingles);
-      }
-      if (sc.pointingPairs > 0) {
-        ImGui::Text("Pointing Pairs:     %3d x  10 = %4d", sc.pointingPairs / 10, sc.pointingPairs);
-      }
-      if (sc.boxLineReductions > 0) {
-        ImGui::Text("Box/Line Reduction: %3d x  10 = %4d", sc.boxLineReductions / 10, sc.boxLineReductions);
-      }
-      if (sc.nakedPairs > 0) {
-        ImGui::Text("Naked Pairs:        %3d x  15 = %4d", sc.nakedPairs / 15,    sc.nakedPairs);
-      }
-      if (sc.hiddenPairs > 0) {
-        ImGui::Text("Hidden Pairs:       %3d x  20 = %4d", sc.hiddenPairs / 20,   sc.hiddenPairs);
-      }
-      if (sc.nakedTriples > 0) {
-        ImGui::Text("Naked Triples:      %3d x  30 = %4d", sc.nakedTriples / 30,  sc.nakedTriples);
-      }
-      if (sc.hiddenTriples > 0) {
-        ImGui::Text("Hidden Triples:     %3d x  40 = %4d", sc.hiddenTriples / 40, sc.hiddenTriples);
-      }
-      if (sc.nakedQuads > 0) {
-        ImGui::Text("Naked Quads:        %3d x  50 = %4d", sc.nakedQuads / 50,    sc.nakedQuads);
-      }
-      if (sc.hiddenQuads > 0) {
-        ImGui::Text("Hidden Quads:       %3d x  60 = %4d", sc.hiddenQuads / 60,   sc.hiddenQuads);
-      }
-      if (sc.blockBlockInteractions > 0) {
-        ImGui::Text("Block/Block:        %3d x  25 = %4d", sc.blockBlockInteractions / 25, sc.blockBlockInteractions);
-      }
-      if (sc.xWings > 0) {
-        ImGui::Text("X-Wing:             %3d x  80 = %4d", sc.xWings / 80,        sc.xWings);
-      }
-      if (sc.uniqueRectangles > 0) {
-        ImGui::Text("Unique Rectangle:   %3d x  70 = %4d", sc.uniqueRectangles / 70, sc.uniqueRectangles);
-      }
-      if (sc.yWings > 0) {
-        ImGui::Text("Y-Wing:             %3d x 100 = %4d", sc.yWings / 100,       sc.yWings);
-      }
-      if (sc.simpleColourings > 0) {
-        ImGui::Text("Simple Colouring:   %3d x 120 = %4d", sc.simpleColourings / 120, sc.simpleColourings);
-      }
-      if (sc.swordfishes > 0) {
-        ImGui::Text("Swordfish:          %3d x 140 = %4d", sc.swordfishes / 140,  sc.swordfishes);
-      }
-      if (sc.xyzWings > 0) {
-        ImGui::Text("XYZ-Wing:           %3d x 150 = %4d", sc.xyzWings / 150,     sc.xyzWings);
-      }
-      if (sc.xyChains > 0) {
-        ImGui::Text("XY-Chain:           %3d x 200 = %4d", sc.xyChains / 200,     sc.xyChains);
-      }
-      if (sc.jellyfishes > 0) {
-        ImGui::Text("Jellyfish:          %3d x 200 = %4d", sc.jellyfishes / 200,  sc.jellyfishes);
-      }
-      if (sc.forcingChains > 0) {
-        ImGui::Text("Forcing Chains:     %3d x 300 = %4d", sc.forcingChains / 300, sc.forcingChains);
+      // Data-driven score breakdown table
+      struct ScoreRow {
+        const char* label;
+        int value;
+        int pointsEach;
+      };
+      const ScoreRow rows[] = {
+        {"Naked Singles",      sc.nakedSingles,         1},
+        {"Hidden Singles",     sc.hiddenSingles,        3},
+        {"Pointing Pairs",     sc.pointingPairs,       10},
+        {"Box/Line Reduction", sc.boxLineReductions,   10},
+        {"Naked Pairs",        sc.nakedPairs,          15},
+        {"Hidden Pairs",       sc.hiddenPairs,         20},
+        {"Naked Triples",      sc.nakedTriples,        30},
+        {"Hidden Triples",     sc.hiddenTriples,       40},
+        {"Naked Quads",        sc.nakedQuads,          50},
+        {"Hidden Quads",       sc.hiddenQuads,         60},
+        {"Block/Block",        sc.blockBlockInteractions, 25},
+        {"X-Wing",             sc.xWings,              80},
+        {"Unique Rectangle",   sc.uniqueRectangles,    70},
+        {"Y-Wing",             sc.yWings,             100},
+        {"Simple Colouring",   sc.simpleColourings,   120},
+        {"Swordfish",          sc.swordfishes,        140},
+        {"XYZ-Wing",           sc.xyzWings,           150},
+        {"XY-Chain",           sc.xyChains,           200},
+        {"Jellyfish",          sc.jellyfishes,        200},
+        {"Forcing Chains",     sc.forcingChains,      300},
+      };
+
+      for (const auto& row : rows) {
+        if (row.value > 0) {
+          ImGui::Text("%-22s %3d x %3d = %4d", row.label, row.value / row.pointsEach,
+                      row.pointsEach, row.value);
+        }
       }
 
       ImGui::Spacing();
