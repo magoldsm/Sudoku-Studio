@@ -28,6 +28,28 @@ cmake --build build -j
 - C++ compiler: MSVC (Visual Studio 2019+), MinGW-w64, or Clang
 - Git (for dependencies)
 
+**Using VS Code (Recommended):**
+
+1. Install extensions in VS Code:
+   - **CMake Tools** (ms-vscode.cmake-tools)
+   - **C/C++** (ms-vscode.cpptools)
+
+2. Open the project folder in VS Code
+
+3. VS Code will detect CMakeLists.txt and prompt to select a compiler kit (e.g., "Visual Studio 17 2022")
+
+4. Configure and build:
+   - Press `Ctrl+Shift+P` → "CMake: Configure"
+   - Press `F7` (or `Ctrl+Shift+P` → "CMake: Build")
+
+5. Run:
+   - In the CMake sidebar, under "Launch", select `sudoku_ui`
+   - Press `Ctrl+F5` to run (or `F5` to debug)
+
+All dependencies are fetched automatically by CMake.
+
+**Command Line (Alternative):**
+
 **With MSVC (Visual Studio):**
 
 CMake will auto-detect your installed Visual Studio version. Use one of:
