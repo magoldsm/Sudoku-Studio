@@ -1495,6 +1495,25 @@ std::vector<int> GetMissingCandidates(const Grid& grid, int row, int col) {
   return missing;
 }
 
+ValidationWarning ValidateUserCandidates(const Grid& grid) {
+  ValidationWarning warning;
+
+  // Check each unsolved cell for erased-but-legal candidates
+  for (int row = 0; row < kGridSize; ++row) {
+    for (int col = 0; col < kGridSize; ++col) {
+      const Cell& cell = grid[row][col];
+      if (cell.value == 0) {
+        const std::vector<int> missing = GetMissingCandidates(grid, row, col);
+        if (!missing.empty()) {
+          warning.erasedButLegal.push_back({row, col, missing});
+        }
+      }
+    }
+  }
+
+  return warning;
+}
+
 int ApplyNakedSingles(Grid& grid) {
   int placements = 0;
   for (int row = 0; row < kGridSize; ++row) {
@@ -2778,6 +2797,8 @@ Hint GenerateHint(const Grid& grid) {
 
   Hint emptyHint;
   emptyHint.techniqueName = "No supported Sadman hint available";
+  // Validate user's pencil marks when no solving hint is found
+  emptyHint.validation = ValidateUserCandidates(grid);
   return emptyHint;
 }
 

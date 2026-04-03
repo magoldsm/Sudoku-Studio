@@ -66,6 +66,8 @@ int ApplyAutoPencil(Grid& grid);
 bool HasStaleOrIncorrectPencilMarks(const Grid& grid);
 // Computes missing legal candidates for a specific cell (what user erased that's still legal)
 std::vector<int> GetMissingCandidates(const Grid& grid, int row, int col);
+// Validates user's pencil marks against legal candidates; returns erased-but-legal candidates
+ValidationWarning ValidateUserCandidates(const Grid& grid);
 // Applies one pass of placements; returns number of placed values.
 int ApplyNakedSingles(Grid& grid);
 int ApplyHiddenSingles(Grid& grid);

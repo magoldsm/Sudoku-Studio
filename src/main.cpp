@@ -875,6 +875,19 @@ void DrawBoard(UIState& uiState,
       if (puzzleState.grid[r][c].colorTag > 0) {
         fill = kTagColors[puzzleState.grid[r][c].colorTag];
       }
+
+      // Check if this cell has erased-but-legal candidates (validation warning)
+      bool isValidationCell = false;
+      for (const MissingCandidate& mc : uiState.currentHint.validation.erasedButLegal) {
+        if (mc.row == r && mc.col == c) {
+          isValidationCell = true;
+          break;
+        }
+      }
+      if (isValidationCell) {
+        fill = kValidationWarningCellColor;
+      }
+
       const int chainIndex = (uiState.currentHint.revealPhase >= 2) ? uiState.currentHint.ChainIndex(r, c) : -1;
       if (chainIndex >= 0) {
         // Chain cells get alternating colors (priority over general hint color)
@@ -1570,7 +1583,12 @@ int main(int argc, char** argv) {
         // Set persistent warning flag if pencil marks are stale
         uiState.hasStalePencilMarksWarning = HasStaleOrIncorrectPencilMarks(puzzleState.grid);
 
-        uiState.statusMessage = "Hint: " + uiState.currentHint.techniqueName;
+        // Check if this is a validation warning (no solving hint found)
+        if (!uiState.currentHint.validation.erasedButLegal.empty()) {
+          uiState.statusMessage = "No solving hint available. Review your pencil marks.";
+        } else {
+          uiState.statusMessage = "Hint: " + uiState.currentHint.techniqueName;
+        }
         uiState.statusFrames = 300;
         uiState.hintPhaseCounter = 0;
       } else if (uiState.currentHint.revealPhase == 1) {
@@ -1725,6 +1743,24 @@ int main(int argc, char** argv) {
     if (uiState.hasStalePencilMarksWarning) {
       ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f),
                          "Erroneous or missing pencil marks.  Try Auto Pencil to correct.");
+    }
+
+    // Validation warning: erased-but-legal candidates (Stage 1 + Stage 2)
+    if (!uiState.currentHint.validation.erasedButLegal.empty()) {
+      ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f),
+                         "Stage 1: You appear to have erased valid candidate(s). Review your work.");
+      ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f),
+                         "Stage 2: Erased candidates still legal:");
+      for (const MissingCandidate& mc : uiState.currentHint.validation.erasedButLegal) {
+        std::string digits_str;
+        for (int d : mc.missingDigits) {
+          if (!digits_str.empty()) digits_str += ", ";
+          digits_str += std::to_string(d);
+        }
+        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f),
+                           "  r%dc%d: %s",
+                           mc.row + 1, mc.col + 1, digits_str.c_str());
+      }
     }
 
     if (uiState.openSnapshotPopup) {

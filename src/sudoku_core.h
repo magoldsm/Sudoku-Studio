@@ -68,6 +68,18 @@ struct HintCell {
   }
 };
 
+// Missing candidate for hint-affected cells (also used in validation)
+struct MissingCandidate {
+  int row = -1;
+  int col = -1;
+  std::vector<int> missingDigits;  // Digits 1-9 that are legal but not in user's pencil marks
+};
+
+// Validation results for erroneous candidate eliminations
+struct ValidationWarning {
+  std::vector<MissingCandidate> erasedButLegal;  // Candidates user erased that are still legal
+};
+
 struct Hint {
   std::string techniqueName;
   std::vector<HintCell> affectedCells;
@@ -76,6 +88,7 @@ struct Hint {
   std::vector<HintCell> chainCells;
   // 0 = none, 1 = technique name, 2 = cells highlighted, 3 = digits highlighted.
   int revealPhase = 0;
+  ValidationWarning validation;  // Populated when no solving hint found
 
   bool IsValid() const {
     return !techniqueName.empty() && !affectedCells.empty();
