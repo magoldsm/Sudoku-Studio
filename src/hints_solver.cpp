@@ -1499,8 +1499,8 @@ ValidationWarning ValidateUserCandidates(const Grid& grid) {
 }
 
 int ApplyNakedSingles(Grid& grid) {
-  // Use full legal candidates (for solver speed during generation)
-  // Hints use ApplyHintWithCandidates for pencil-mark-aware solving
+  // Optimization: use pencil marks when available (fast, maintained during solving)
+  // Fall back to ComputeCandidates only for hints where marks might be partial
   int placements = 0;
   for (int row = 0; row < kGridSize; ++row) {
     for (int col = 0; col < kGridSize; ++col) {
@@ -1509,7 +1509,9 @@ int ApplyNakedSingles(Grid& grid) {
         continue;
       }
 
-      const std::bitset<9> candidates = ComputeCandidates(grid, row, col);
+      // Use pencil marks if present (fast, maintained via RemoveDigitFromPeerPencils)
+      // Otherwise compute from scratch (for hints with partial marks)
+      const std::bitset<9> candidates = cell.pencil.any() ? cell.pencil : ComputeCandidates(grid, row, col);
       if (candidates.count() != 1) {
         continue;
       }
@@ -1529,8 +1531,8 @@ int ApplyNakedSingles(Grid& grid) {
 }
 
 int ApplyHiddenSingles(Grid& grid) {
-  // Use full legal candidates (for solver speed during generation)
-  // Hints use ApplyHintWithCandidates for pencil-mark-aware solving
+  // Optimization: use pencil marks when available (fast, maintained during solving)
+  // Fall back to ComputeCandidates only for hints where marks might be partial
   int placements = 0;
 
   for (int row = 0; row < kGridSize; ++row) {
@@ -1541,7 +1543,7 @@ int ApplyHiddenSingles(Grid& grid) {
         if (grid[row][col].value != 0) {
           continue;
         }
-        const std::bitset<9> candidates = ComputeCandidates(grid, row, col);
+        const std::bitset<9> candidates = grid[row][col].pencil.any() ? grid[row][col].pencil : ComputeCandidates(grid, row, col);
         if (candidates.test(digit - 1)) {
           ++count;
           matchCol = col;
@@ -1564,7 +1566,7 @@ int ApplyHiddenSingles(Grid& grid) {
         if (grid[row][col].value != 0) {
           continue;
         }
-        const std::bitset<9> candidates = ComputeCandidates(grid, row, col);
+        const std::bitset<9> candidates = grid[row][col].pencil.any() ? grid[row][col].pencil : ComputeCandidates(grid, row, col);
         if (candidates.test(digit - 1)) {
           ++count;
           matchRow = row;
@@ -1592,7 +1594,7 @@ int ApplyHiddenSingles(Grid& grid) {
             if (grid[row][col].value != 0) {
               continue;
             }
-            const std::bitset<9> candidates = ComputeCandidates(grid, row, col);
+            const std::bitset<9> candidates = grid[row][col].pencil.any() ? grid[row][col].pencil : ComputeCandidates(grid, row, col);
             if (candidates.test(digit - 1)) {
               ++count;
               foundRow = row;

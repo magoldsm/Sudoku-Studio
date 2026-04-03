@@ -36,7 +36,7 @@ cmake --build build -j
 
 2. Open the project folder in VS Code
 
-3. VS Code will detect CMakeLists.txt and prompt to select a compiler kit (e.g., "Visual Studio 17 2022")
+3. VS Code will detect CMakeLists.txt and prompt to select a compiler kit (e.g., "Visual Studio 111 2022")
 
 4. Configure and build:
    - Press `Ctrl+Shift+P` → "CMake: Configure"
