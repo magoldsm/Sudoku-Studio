@@ -144,6 +144,9 @@ void DrawColorTagPanel(Grid& grid,
     ImGui::InvisibleButton(("pos" + std::to_string(digit)).c_str(), buttonSize);
     if (ImGui::IsItemClicked()) {
       showPositionDigit = (showPositionDigit == digit) ? 0 : digit;
+      if (showPositionDigit != 0) {
+        highlightPairs = false;  // Exclusive: clear pairs when position button is clicked
+      }
     }
 
     // Draw green circle
@@ -248,6 +251,9 @@ void DrawColorTagPanel(Grid& grid,
   ImGui::InvisibleButton("pairs", pairsButtonSize);
   if (ImGui::IsItemClicked()) {
     highlightPairs = !highlightPairs;
+    if (highlightPairs) {
+      showPositionDigit = 0;  // Exclusive: clear position highlight when pairs is clicked
+    }
   }
 
   // Draw two circles touching at 45 degree angle

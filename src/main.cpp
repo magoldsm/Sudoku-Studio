@@ -1408,10 +1408,6 @@ int main(int argc, char** argv) {
       requestSolveHiddenSingles = true;
     }
     ImGui::SameLine();
-    if (ImGui::Button(uiState.highlightPairs ? "Pairs On" : "Pairs Off", ImVec2(110, 34))) {
-      requestTogglePairs = true;
-    }
-    ImGui::SameLine();
     if (ImGui::Button(uiState.showWrongEntrySlash ? "Slash On" : "Slash Off", ImVec2(105, 34))) {
       requestToggleSlash = true;
     }
