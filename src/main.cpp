@@ -193,7 +193,6 @@ bool CopyToSystemClipboard(const std::string& text) {
   #ifdef _WIN32
     // On native Windows, ImGui's SetClipboardText should work via GLFW
     ImGui::SetClipboardText(text.c_str());
-    std::cerr << "Clipboard: Using Windows GLFW clipboard" << std::endl;
     return true;
   #else
     // On WSL, use clip.exe directly (avoid X11 connection issues)
@@ -201,15 +200,12 @@ bool CopyToSystemClipboard(const std::string& text) {
     if (isWSL) {
       FILE* pipe = popen("clip.exe", "w");
       if (pipe) {
-        size_t written = fwrite(text.c_str(), 1, text.size(), pipe);
+        fwrite(text.c_str(), 1, text.size(), pipe);
         int ret = pclose(pipe);
         if (ret == 0) {
-          std::cerr << "Clipboard: Successfully copied " << written << " bytes via clip.exe (WSL)" << std::endl;
           return true;
         }
-        std::cerr << "Clipboard: clip.exe returned " << ret << std::endl;
       }
-      std::cerr << "Clipboard: clip.exe not available on WSL" << std::endl;
       return false;
     }
 
@@ -217,33 +213,24 @@ bool CopyToSystemClipboard(const std::string& text) {
     // Try xclip first (most common)
     FILE* pipe = popen("xclip -selection clipboard", "w");
     if (pipe) {
-      size_t written = fwrite(text.c_str(), 1, text.size(), pipe);
+      fwrite(text.c_str(), 1, text.size(), pipe);
       int ret = pclose(pipe);
       if (ret == 0) {
-        std::cerr << "Clipboard: Successfully copied " << written << " bytes via xclip" << std::endl;
         return true;
       }
-      std::cerr << "Clipboard: xclip returned " << ret << std::endl;
-    } else {
-      std::cerr << "Clipboard: xclip not available" << std::endl;
     }
 
     // Try xsel as fallback
     pipe = popen("xsel --clipboard --input", "w");
     if (pipe) {
-      size_t written = fwrite(text.c_str(), 1, text.size(), pipe);
+      fwrite(text.c_str(), 1, text.size(), pipe);
       int ret = pclose(pipe);
       if (ret == 0) {
-        std::cerr << "Clipboard: Successfully copied " << written << " bytes via xsel" << std::endl;
         return true;
       }
-      std::cerr << "Clipboard: xsel returned " << ret << std::endl;
-    } else {
-      std::cerr << "Clipboard: xsel not available" << std::endl;
     }
 
     // Fallback: try ImGui's method anyway
-    std::cerr << "Clipboard: All system methods failed, falling back to ImGui" << std::endl;
     ImGui::SetClipboardText(text.c_str());
     return false;
   #endif
