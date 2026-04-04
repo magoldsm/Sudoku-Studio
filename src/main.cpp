@@ -4,6 +4,7 @@
 #include <bitset>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <mutex>
@@ -144,6 +145,44 @@ bool UndoLastChange(Grid& grid, std::vector<Grid>& undoHistory) {
   grid = undoHistory.back();
   undoHistory.pop_back();
   return true;
+}
+
+// Platform-specific clipboard copy that works reliably on Linux/WSL
+bool CopyToSystemClipboard(const std::string& text) {
+  #ifdef _WIN32
+    // On native Windows, ImGui's SetClipboardText should work via GLFW
+    ImGui::SetClipboardText(text.c_str());
+    return true;
+  #else
+    // On Linux/WSL, try multiple methods
+    // Try xclip first (most common)
+    FILE* pipe = popen("xclip -selection clipboard 2>/dev/null", "w");
+    if (pipe) {
+      fputs(text.c_str(), pipe);
+      pclose(pipe);
+      return true;
+    }
+
+    // Try xsel as fallback
+    pipe = popen("xsel --clipboard --input 2>/dev/null", "w");
+    if (pipe) {
+      fputs(text.c_str(), pipe);
+      pclose(pipe);
+      return true;
+    }
+
+    // On WSL, try copying via Windows clipboard
+    pipe = popen("clip.exe 2>/dev/null", "w");
+    if (pipe) {
+      fputs(text.c_str(), pipe);
+      pclose(pipe);
+      return true;
+    }
+
+    // Fallback: try ImGui's method anyway
+    ImGui::SetClipboardText(text.c_str());
+    return false;
+  #endif
 }
 
 bool IsSafeInPuzzle(const Puzzle& board, int row, int col, int digit) {
@@ -1775,7 +1814,7 @@ int main(int argc, char** argv) {
       ImGui::TextUnformatted("Copy this snapshot into chat with a description of the bug.");
       ImGui::Spacing();
       if (ImGui::Button("Copy to Clipboard", ImVec2(160.0f, 0.0f))) {
-        ImGui::SetClipboardText(uiState.snapshotText.c_str());
+        CopyToSystemClipboard(uiState.snapshotText);
       }
       ImGui::SameLine();
       if (ImGui::Button("Close", ImVec2(90.0f, 0.0f))) {
