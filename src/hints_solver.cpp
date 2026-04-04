@@ -476,19 +476,32 @@ Hint DetectNakedSubset(const CandidateGrid& candidates, int subsetSize, const ch
           return false;
         }
 
-        bool hasElimination = false;
+        // Check if this pair can actually eliminate candidates from other cells.
+        // Find target cells: those that share candidates with the pair AND have other candidates.
+        bool hasUsefulElimination = false;
+        std::vector<HintCell> targetCells;
         for (int index = 0; index < 9; ++index) {
           if (std::find(choice.begin(), choice.end(), index) != choice.end()) {
             continue;
           }
           const HintCell& cell = unit.cells[index];
-          if ((candidates[cell.row][cell.col] & unionMask).any()) {
-            AddUniqueCell(affected, cell.row, cell.col);
-            hasElimination = true;
+          const std::bitset<9> overlap = candidates[cell.row][cell.col] & unionMask;
+          if (overlap.any()) {
+            // This cell shares candidates with the pair. But only include it if it has
+            // OTHER candidates too (otherwise eliminating would break the puzzle).
+            if ((candidates[cell.row][cell.col] & ~unionMask).any()) {
+              hasUsefulElimination = true;
+              AddUniqueCell(targetCells, cell.row, cell.col);
+            }
           }
         }
 
-        if (hasElimination) {
+        // Only report if this pair can eliminate from at least one cell that has other candidates
+        if (hasUsefulElimination) {
+          std::vector<HintCell> affected = targetCells;
+          for (int index : choice) {
+            AddUniqueCell(affected, unit.cells[index].row, unit.cells[index].col);
+          }
           throw MakeHint(name, affected, ExtractDigits(unionMask));
         }
         return false;
