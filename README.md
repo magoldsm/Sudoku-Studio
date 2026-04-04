@@ -14,7 +14,29 @@ It combines a puzzle workspace, interactive solving tools, and an advanced hint 
 
 ## Build
 
-### Linux / macOS
+### macOS
+
+**Prerequisites:**
+- Xcode Command Line Tools (includes clang, git)
+  ```bash
+  xcode-select --install
+  ```
+- CMake 3.16+ ([download](https://cmake.org/download/) or `brew install cmake`)
+
+**Build:**
+```bash
+cmake -S . -B build
+cmake --build build -j
+```
+
+**Run:**
+```bash
+./build/sudoku_ui
+```
+
+All dependencies (GLFW, Dear ImGui, OpenGL) are fetched automatically by CMake.
+
+### Linux
 
 ```bash
 cmake -S . -B build
@@ -138,7 +160,7 @@ To customize the installer (package name, version, website URLs, icon), edit the
 
 ## Run
 
-**Linux / macOS:**
+**macOS / Linux:**
 ```bash
 ./build/sudoku_ui
 ```
@@ -154,7 +176,7 @@ To customize the installer (package name, version, website URLs, icon), edit the
 
 **Detector Self-Check** — validates hint detection consistency:
 
-Linux / macOS:
+macOS / Linux:
 ```bash
 ./build/sudoku_ui --self-check
 ```
@@ -168,7 +190,7 @@ Reports detector coverage and failures across generated puzzle states.
 
 **Generator/Solver Synchronization Test** — validates puzzle generation and solving:
 
-Linux / macOS:
+macOS / Linux:
 ```bash
 ./build/sudoku_ui --test-generation
 ```
