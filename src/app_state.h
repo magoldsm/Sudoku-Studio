@@ -49,6 +49,7 @@ struct UIState {
   static constexpr size_t kLoadInputBufSize = 16384;
   char loadInputBuf[kLoadInputBufSize] = {};
   char snapshotDisplayBuf[kLoadInputBufSize] = {};  // For displaying selectable snapshot text
+  int snapshotCopiedFeedback = 0;  // Frames to show "Copied!" message
   bool openLoadPopup = false;
   std::string loadErrorMessage;
 

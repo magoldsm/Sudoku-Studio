@@ -152,34 +152,54 @@ bool CopyToSystemClipboard(const std::string& text) {
   #ifdef _WIN32
     // On native Windows, ImGui's SetClipboardText should work via GLFW
     ImGui::SetClipboardText(text.c_str());
+    std::cerr << "Clipboard: Using Windows GLFW clipboard" << std::endl;
     return true;
   #else
     // On Linux/WSL, try multiple methods
     // Try xclip first (most common)
-    FILE* pipe = popen("xclip -selection clipboard 2>/dev/null", "w");
+    FILE* pipe = popen("xclip -selection clipboard", "w");
     if (pipe) {
-      fputs(text.c_str(), pipe);
-      pclose(pipe);
-      return true;
+      size_t written = fwrite(text.c_str(), 1, text.size(), pipe);
+      int ret = pclose(pipe);
+      if (ret == 0) {
+        std::cerr << "Clipboard: Successfully copied " << written << " bytes via xclip" << std::endl;
+        return true;
+      }
+      std::cerr << "Clipboard: xclip returned " << ret << std::endl;
+    } else {
+      std::cerr << "Clipboard: xclip not available" << std::endl;
     }
 
     // Try xsel as fallback
-    pipe = popen("xsel --clipboard --input 2>/dev/null", "w");
+    pipe = popen("xsel --clipboard --input", "w");
     if (pipe) {
-      fputs(text.c_str(), pipe);
-      pclose(pipe);
-      return true;
+      size_t written = fwrite(text.c_str(), 1, text.size(), pipe);
+      int ret = pclose(pipe);
+      if (ret == 0) {
+        std::cerr << "Clipboard: Successfully copied " << written << " bytes via xsel" << std::endl;
+        return true;
+      }
+      std::cerr << "Clipboard: xsel returned " << ret << std::endl;
+    } else {
+      std::cerr << "Clipboard: xsel not available" << std::endl;
     }
 
     // On WSL, try copying via Windows clipboard
-    pipe = popen("clip.exe 2>/dev/null", "w");
+    pipe = popen("clip.exe", "w");
     if (pipe) {
-      fputs(text.c_str(), pipe);
-      pclose(pipe);
-      return true;
+      size_t written = fwrite(text.c_str(), 1, text.size(), pipe);
+      int ret = pclose(pipe);
+      if (ret == 0) {
+        std::cerr << "Clipboard: Successfully copied " << written << " bytes via clip.exe" << std::endl;
+        return true;
+      }
+      std::cerr << "Clipboard: clip.exe returned " << ret << std::endl;
+    } else {
+      std::cerr << "Clipboard: clip.exe not available" << std::endl;
     }
 
     // Fallback: try ImGui's method anyway
+    std::cerr << "Clipboard: All system methods failed, falling back to ImGui" << std::endl;
     ImGui::SetClipboardText(text.c_str());
     return false;
   #endif
@@ -1812,9 +1832,17 @@ int main(int argc, char** argv) {
 
     if (ImGui::BeginPopupModal("Board Snapshot", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
       ImGui::TextUnformatted("Copy this snapshot into chat with a description of the bug.");
+      ImGui::TextUnformatted("(Or triple-click to select all, then Ctrl+C to copy)");
       ImGui::Spacing();
       if (ImGui::Button("Copy to Clipboard", ImVec2(160.0f, 0.0f))) {
-        CopyToSystemClipboard(uiState.snapshotText);
+        if (CopyToSystemClipboard(uiState.snapshotText)) {
+          uiState.snapshotCopiedFeedback = 120;  // Show feedback for 120 frames (~2 seconds)
+        }
+      }
+      ImGui::SameLine();
+      if (uiState.snapshotCopiedFeedback > 0) {
+        ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), "✓ Copied to clipboard!");
+        uiState.snapshotCopiedFeedback--;
       }
       ImGui::SameLine();
       if (ImGui::Button("Close", ImVec2(90.0f, 0.0f))) {
@@ -1832,6 +1860,11 @@ int main(int argc, char** argv) {
                                 uiState.kLoadInputBufSize,
                                 ImVec2(720.0f, 420.0f),
                                 ImGuiInputTextFlags_ReadOnly);
+      // Handle Ctrl+C when the text field is focused
+      if (ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_C) && ImGui::GetIO().KeyCtrl) {
+        CopyToSystemClipboard(uiState.snapshotText);
+        uiState.snapshotCopiedFeedback = 120;
+      }
       ImGui::EndPopup();
     }
 
