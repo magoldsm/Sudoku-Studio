@@ -1821,10 +1821,17 @@ int main(int argc, char** argv) {
         ImGui::CloseCurrentPopup();
       }
       ImGui::Spacing();
-      ImGui::BeginChild("SnapshotText", ImVec2(720.0f, 420.0f), true,
-                        ImGuiWindowFlags_HorizontalScrollbar);
-      ImGui::TextUnformatted(uiState.snapshotText.c_str());
-      ImGui::EndChild();
+      // Use InputTextMultiline for selectable, copyable text (read-only mode)
+      // Copy snapshot text to display buffer for ImGui
+      if (!uiState.snapshotText.empty()) {
+        const size_t len = std::min(uiState.snapshotText.size(), uiState.kLoadInputBufSize - 1);
+        memcpy(uiState.snapshotDisplayBuf, uiState.snapshotText.c_str(), len);
+        uiState.snapshotDisplayBuf[len] = '\0';
+      }
+      ImGui::InputTextMultiline("##snapshottext", uiState.snapshotDisplayBuf,
+                                uiState.kLoadInputBufSize,
+                                ImVec2(720.0f, 420.0f),
+                                ImGuiInputTextFlags_ReadOnly);
       ImGui::EndPopup();
     }
 

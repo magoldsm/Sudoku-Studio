@@ -48,6 +48,7 @@ struct UIState {
   bool openSnapshotPopup = false;
   static constexpr size_t kLoadInputBufSize = 16384;
   char loadInputBuf[kLoadInputBufSize] = {};
+  char snapshotDisplayBuf[kLoadInputBufSize] = {};  // For displaying selectable snapshot text
   bool openLoadPopup = false;
   std::string loadErrorMessage;
 
