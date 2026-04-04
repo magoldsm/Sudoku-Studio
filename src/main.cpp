@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <iostream>
 #include <mutex>
@@ -147,6 +148,46 @@ bool UndoLastChange(Grid& grid, std::vector<Grid>& undoHistory) {
   return true;
 }
 
+// Normalize line endings: convert CRLF to LF for consistent handling
+void NormalizeLineEndings(char* text, size_t maxLen) {
+  if (!text) return;
+
+  size_t readPos = 0;
+  size_t writePos = 0;
+
+  while (readPos < maxLen && text[readPos] != '\0') {
+    if (text[readPos] == '\r' && readPos + 1 < maxLen && text[readPos + 1] == '\n') {
+      // Skip the \r, keep the \n
+      text[writePos++] = '\n';
+      readPos += 2;
+    } else if (text[readPos] == '\r') {
+      // Standalone \r, convert to \n
+      text[writePos++] = '\n';
+      readPos++;
+    } else {
+      text[writePos++] = text[readPos++];
+    }
+  }
+  text[writePos] = '\0';
+}
+
+// Detect if running on WSL
+bool IsWSL() {
+  FILE* fp = fopen("/proc/version", "r");
+  if (!fp) return false;
+
+  char line[256];
+  bool wsl = false;
+  if (fgets(line, sizeof(line), fp)) {
+    // Check for "microsoft" or "WSL" in /proc/version
+    if (strstr(line, "microsoft") || strstr(line, "WSL")) {
+      wsl = true;
+    }
+  }
+  fclose(fp);
+  return wsl;
+}
+
 // Platform-specific clipboard copy that works reliably on Linux/WSL
 bool CopyToSystemClipboard(const std::string& text) {
   #ifdef _WIN32
@@ -155,7 +196,24 @@ bool CopyToSystemClipboard(const std::string& text) {
     std::cerr << "Clipboard: Using Windows GLFW clipboard" << std::endl;
     return true;
   #else
-    // On Linux/WSL, try multiple methods
+    // On WSL, use clip.exe directly (avoid X11 connection issues)
+    static bool isWSL = IsWSL();
+    if (isWSL) {
+      FILE* pipe = popen("clip.exe", "w");
+      if (pipe) {
+        size_t written = fwrite(text.c_str(), 1, text.size(), pipe);
+        int ret = pclose(pipe);
+        if (ret == 0) {
+          std::cerr << "Clipboard: Successfully copied " << written << " bytes via clip.exe (WSL)" << std::endl;
+          return true;
+        }
+        std::cerr << "Clipboard: clip.exe returned " << ret << std::endl;
+      }
+      std::cerr << "Clipboard: clip.exe not available on WSL" << std::endl;
+      return false;
+    }
+
+    // On native Linux, try xclip/xsel (avoid if X11 is broken)
     // Try xclip first (most common)
     FILE* pipe = popen("xclip -selection clipboard", "w");
     if (pipe) {
@@ -182,20 +240,6 @@ bool CopyToSystemClipboard(const std::string& text) {
       std::cerr << "Clipboard: xsel returned " << ret << std::endl;
     } else {
       std::cerr << "Clipboard: xsel not available" << std::endl;
-    }
-
-    // On WSL, try copying via Windows clipboard
-    pipe = popen("clip.exe", "w");
-    if (pipe) {
-      size_t written = fwrite(text.c_str(), 1, text.size(), pipe);
-      int ret = pclose(pipe);
-      if (ret == 0) {
-        std::cerr << "Clipboard: Successfully copied " << written << " bytes via clip.exe" << std::endl;
-        return true;
-      }
-      std::cerr << "Clipboard: clip.exe returned " << ret << std::endl;
-    } else {
-      std::cerr << "Clipboard: clip.exe not available" << std::endl;
     }
 
     // Fallback: try ImGui's method anyway
@@ -1832,7 +1876,6 @@ int main(int argc, char** argv) {
 
     if (ImGui::BeginPopupModal("Board Snapshot", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
       ImGui::TextUnformatted("Copy this snapshot into chat with a description of the bug.");
-      ImGui::TextUnformatted("(Or triple-click to select all, then Ctrl+C to copy)");
       ImGui::Spacing();
       if (ImGui::Button("Copy to Clipboard", ImVec2(160.0f, 0.0f))) {
         if (CopyToSystemClipboard(uiState.snapshotText)) {
@@ -1860,11 +1903,6 @@ int main(int argc, char** argv) {
                                 uiState.kLoadInputBufSize,
                                 ImVec2(720.0f, 420.0f),
                                 ImGuiInputTextFlags_ReadOnly);
-      // Handle Ctrl+C when the text field is focused
-      if (ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_C) && ImGui::GetIO().KeyCtrl) {
-        CopyToSystemClipboard(uiState.snapshotText);
-        uiState.snapshotCopiedFeedback = 120;
-      }
       ImGui::EndPopup();
     }
 
@@ -1884,10 +1922,14 @@ int main(int argc, char** argv) {
           const size_t len = std::min(strlen(cb), uiState.kLoadInputBufSize - 1);
           memcpy(uiState.loadInputBuf, cb, len);
           uiState.loadInputBuf[len] = '\0';
+          // Normalize line endings (CRLF -> LF) for consistent display in InputTextMultiline
+          NormalizeLineEndings(uiState.loadInputBuf, uiState.kLoadInputBufSize);
         }
       }
       ImGui::SameLine();
       if (ImGui::Button("Load", ImVec2(80.0f, 0.0f))) {
+        // Normalize line endings before loading (in case user pasted directly into field)
+        NormalizeLineEndings(uiState.loadInputBuf, uiState.kLoadInputBufSize);
         const SnapshotLoadResult loaded = DeserializeSnapshot(uiState.loadInputBuf);
         if (!loaded.ok) {
           uiState.loadErrorMessage = loaded.errorMessage;
