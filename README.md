@@ -67,7 +67,7 @@ Or specify your version explicitly:
 cmake -S . -B build -G "Visual Studio 17 2022"
 
 # For Visual Studio 2026:
-cmake -S . -B build -G "Visual Studio 18 2025"
+cmake -S . -B build -G "Visual Studio 18 2026"
 
 # For other versions, check available generators:
 cmake --help
