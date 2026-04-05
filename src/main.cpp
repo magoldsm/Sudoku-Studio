@@ -17,6 +17,7 @@
 #include <GLFW/glfw3.h>
 
 #ifdef _WIN32
+  #define GLFW_EXPOSE_NATIVE_WIN32  // Enable native Windows functions
   #define NOMINMAX  // Prevent windows.h from defining min/max macros
   #include <windows.h>
   #include <GLFW/glfw3native.h>  // For glfwGetWin32Window()
