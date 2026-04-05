@@ -16,13 +16,6 @@
 
 #include <GLFW/glfw3.h>
 
-#ifdef _WIN32
-  #define GLFW_EXPOSE_NATIVE_WIN32  // Enable native Windows functions
-  #define NOMINMAX  // Prevent windows.h from defining min/max macros
-  #include <windows.h>
-  #include <GLFW/glfw3native.h>  // For glfwGetWin32Window()
-#endif
-
 #include "app_state.h"
 #include "hints_solver.h"
 #include "imgui.h"
@@ -154,21 +147,10 @@ bool UndoLastChange(Grid& grid, std::vector<Grid>& undoHistory) {
 
 // Set window icon from Windows resources (.rc file)
 void SetWindowIcon(GLFWwindow* window) {
-  #ifdef _WIN32
-    // Load icon from the .rc resource (IDI_ICON1 = resource ID 101)
-    HINSTANCE hInstance = GetModuleHandle(nullptr);
-    HICON hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(101));
-
-    if (hIcon != nullptr) {
-      // Get the native HWND from GLFW window
-      HWND hWnd = glfwGetWin32Window(window);
-      if (hWnd != nullptr) {
-        // Set both small and large icons for window title bar and taskbar
-        SendMessageW(hWnd, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
-        SendMessageW(hWnd, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
-      }
-    }
-  #endif
+  // On Windows: Icon is embedded in .rc resource for File Explorer display
+  // On macOS/Linux: Icons are handled via app bundle / desktop files
+  // No runtime code needed to avoid triggering Smart App Control
+  (void)window;  // Suppress unused parameter warning
 }
 
 // Normalize line endings: convert CRLF to LF for consistent handling
