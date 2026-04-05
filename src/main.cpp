@@ -151,22 +151,10 @@ bool UndoLastChange(Grid& grid, std::vector<Grid>& undoHistory) {
 
 // Set window icon from Windows resources (.rc file)
 void SetWindowIcon(GLFWwindow* window) {
-  #ifdef _WIN32
-    // Load icon from resource (defined in sudoku.rc as IDI_ICON1)
-    HINSTANCE hInstance = GetModuleHandle(nullptr);
-    HICON hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(101));  // 101 is the standard icon resource ID
-
-    if (hIcon != nullptr) {
-      // Create a temporary GLFWimage from the icon
-      // On Windows, we can also set the icon directly via native window class,
-      // but this ensures consistency with GLFW's window management
-      glfwSetWindowIcon(window, 0, nullptr);  // Clear any existing icons
-
-      // Note: GLFW will use the window class icon on Windows automatically
-      // Setting it via glfwSetWindowIcon with native HICON would require
-      // platform-specific code, but Windows handles it via the .rc resource
-    }
-  #endif
+  // On Windows: Icon is automatically loaded from .rc resource by the window class
+  // On macOS/Linux: Icons are handled via app bundle / desktop files
+  // No runtime loading needed - the resource compilation handles it
+  (void)window;  // Suppress unused parameter warning
 }
 
 // Normalize line endings: convert CRLF to LF for consistent handling
