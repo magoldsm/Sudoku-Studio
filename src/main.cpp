@@ -16,10 +16,6 @@
 
 #include <GLFW/glfw3.h>
 
-#ifdef _WIN32
-  #include <windows.h>
-#endif
-
 #include "app_state.h"
 #include "hints_solver.h"
 #include "imgui.h"
