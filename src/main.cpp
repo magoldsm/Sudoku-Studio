@@ -16,8 +16,6 @@
 
 #include <GLFW/glfw3.h>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
 
 #include "app_state.h"
 #include "hints_solver.h"
@@ -1172,28 +1170,6 @@ void DrawBoard(UIState& uiState,
 using namespace sudoku;
 
 // Load window icon from PNG file
-void SetWindowIcon(GLFWwindow* window) {
-  std::vector<std::string> iconPaths = {
-    "docs/icon.png",
-    "../docs/icon.png",
-    "../../docs/icon.png",
-  };
-
-  for (const auto& path : iconPaths) {
-    int width, height, channels;
-    unsigned char* pixels = stbi_load(path.c_str(), &width, &height, &channels, 4);
-    if (pixels != nullptr) {
-      GLFWimage icon;
-      icon.width = width;
-      icon.height = height;
-      icon.pixels = pixels;
-      glfwSetWindowIcon(window, 1, &icon);
-      stbi_image_free(pixels);
-      return;
-    }
-  }
-}
-
 int main(int argc, char** argv) {
   if (argc > 1 && std::string(argv[1]) == "--self-check") {
     return RunHintSelfChecks();
@@ -1232,7 +1208,6 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  SetWindowIcon(window);
   glfwMakeContextCurrent(window);
   glfwSwapInterval(1);
 

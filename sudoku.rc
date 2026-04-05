@@ -1,0 +1,33 @@
+#include <windows.h>
+
+// Application icon
+IDI_ICON1 ICON "sudoku_icon.ico"
+
+// Version information
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION 1,0,0,0
+PRODUCTVERSION 1,0,0,0
+FILEFLAGSMASK 0x3f
+FILEFLAGS 0
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904e4"
+        BEGIN
+            VALUE "CompanyName", "Sudoku Studio"
+            VALUE "FileDescription", "Sudoku puzzle generator and solver"
+            VALUE "FileVersion", "1.0.0.0"
+            VALUE "InternalName", "sudoku_ui"
+            VALUE "OriginalFilename", "sudoku_ui.exe"
+            VALUE "ProductName", "Sudoku Studio"
+            VALUE "ProductVersion", "1.0.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1252
+    END
+END

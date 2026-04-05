@@ -54,6 +54,7 @@ add_executable(sudoku_ui
   src/snapshot_io.cpp
   src/help_viewer.cpp
   src/solver_test.cpp
+  $<$<PLATFORM_ID:Windows>:sudoku.rc>
 )
 target_link_libraries(sudoku_ui PRIVATE imgui_lib)
 
