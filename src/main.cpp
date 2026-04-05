@@ -16,6 +16,11 @@
 
 #include <GLFW/glfw3.h>
 
+#ifdef _WIN32
+  #define NOMINMAX  // Prevent windows.h from defining min/max macros
+  #include <windows.h>
+#endif
+
 #include "app_state.h"
 #include "hints_solver.h"
 #include "imgui.h"
@@ -147,10 +152,21 @@ bool UndoLastChange(Grid& grid, std::vector<Grid>& undoHistory) {
 
 // Set window icon from Windows resources (.rc file)
 void SetWindowIcon(GLFWwindow* window) {
-  // On Windows: Icon is automatically loaded from .rc resource by the window class
-  // On macOS/Linux: Icons are handled via app bundle / desktop files
-  // No runtime loading needed - the resource compilation handles it
-  (void)window;  // Suppress unused parameter warning
+  #ifdef _WIN32
+    // Load icon from the .rc resource (IDI_ICON1 = resource ID 101)
+    HINSTANCE hInstance = GetModuleHandle(nullptr);
+    HICON hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(101));
+
+    if (hIcon != nullptr) {
+      // Get the native HWND from GLFW window
+      HWND hWnd = glfwGetWin32Window(window);
+      if (hWnd != nullptr) {
+        // Set both small and large icons for window title bar and taskbar
+        SendMessageW(hWnd, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
+        SendMessageW(hWnd, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
+      }
+    }
+  #endif
 }
 
 // Normalize line endings: convert CRLF to LF for consistent handling
