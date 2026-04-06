@@ -1397,7 +1397,8 @@ int main(int argc, char** argv) {
 
     // Set cursor based on mode, but only when mouse is over the board
     bool mouseOverBoard = ImGui::IsItemHovered();
-    if (mouseOverBoard && modeChanged) {
+    if (mouseOverBoard) {
+      // Show custom cursor when over board
       switch (uiState.mode) {
         case InputMode::kDigit:
           glfwSetCursor(window, cursorPen);
@@ -1409,7 +1410,7 @@ int main(int argc, char** argv) {
           glfwSetCursor(window, cursorRainbow);
           break;
       }
-    } else if (!mouseOverBoard) {
+    } else {
       // Show default arrow cursor when not over board
       glfwSetCursor(window, nullptr);
     }
