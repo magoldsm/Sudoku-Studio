@@ -2901,6 +2901,212 @@ Hint GenerateHint(const Grid& grid) {
   return emptyHint;
 }
 
+int RunOnePass(Grid& grid,
+               PuzzleScore* score,
+               std::vector<const char*>* techniques) {
+  int total = 0;
+  bool changed = false;
+
+  // Naked Singles — apply until stable
+  while (ApplyNakedSingles(grid) > 0) {
+    if (score) score->nakedSingles += GetTechniqueScore(SolvingTechnique::kNakedSingle);
+    if (techniques) techniques->push_back("Naked Singles");
+    total++;
+    changed = true;
+  }
+
+  // Hidden Singles — apply until stable
+  while (ApplyHiddenSingles(grid) > 0) {
+    if (score) score->hiddenSingles += GetTechniqueScore(SolvingTechnique::kHiddenSingle);
+    if (techniques) techniques->push_back("Hidden Singles");
+    total++;
+    changed = true;
+  }
+
+  // Pointing Pairs — apply until stable
+  while (ApplyPointingPairs(grid) > 0) {
+    if (score) score->pointingPairs += GetTechniqueScore(SolvingTechnique::kPointingPair);
+    if (techniques) techniques->push_back("Pointing Pairs");
+    ApplyNakedSingles(grid);
+    ApplyHiddenSingles(grid);
+    total++;
+    changed = true;
+  }
+
+  // Box/Line Reduction — apply until stable
+  while (ApplyBoxLineReduction(grid) > 0) {
+    if (score) score->boxLineReductions += GetTechniqueScore(SolvingTechnique::kBoxLineReduction);
+    if (techniques) techniques->push_back("Box/Line Reduction");
+    ApplyNakedSingles(grid);
+    ApplyHiddenSingles(grid);
+    total++;
+    changed = true;
+  }
+
+  // Naked Pairs — apply until stable
+  while (ApplyNakedPairs(grid) > 0) {
+    if (score) score->nakedPairs += GetTechniqueScore(SolvingTechnique::kNakedPair);
+    if (techniques) techniques->push_back("Naked Pairs");
+    ApplyNakedSingles(grid);
+    ApplyHiddenSingles(grid);
+    total++;
+    changed = true;
+  }
+
+  // Hidden Pairs — apply until stable
+  while (ApplyHiddenPairs(grid) > 0) {
+    if (score) score->hiddenPairs += GetTechniqueScore(SolvingTechnique::kHiddenPair);
+    if (techniques) techniques->push_back("Hidden Pairs");
+    ApplyNakedSingles(grid);
+    ApplyHiddenSingles(grid);
+    total++;
+    changed = true;
+  }
+
+  // Naked Triples — apply until stable
+  while (ApplyNakedTriples(grid) > 0) {
+    if (score) score->nakedTriples += GetTechniqueScore(SolvingTechnique::kNakedTriple);
+    if (techniques) techniques->push_back("Naked Triples");
+    ApplyNakedSingles(grid);
+    ApplyHiddenSingles(grid);
+    total++;
+    changed = true;
+  }
+
+  // Hidden Triples — apply until stable
+  while (ApplyHiddenTriples(grid) > 0) {
+    if (score) score->hiddenTriples += GetTechniqueScore(SolvingTechnique::kHiddenTriple);
+    if (techniques) techniques->push_back("Hidden Triples");
+    ApplyNakedSingles(grid);
+    ApplyHiddenSingles(grid);
+    total++;
+    changed = true;
+  }
+
+  // Naked Quads — apply until stable
+  while (ApplyNakedQuads(grid) > 0) {
+    if (score) score->nakedQuads += GetTechniqueScore(SolvingTechnique::kNakedQuad);
+    if (techniques) techniques->push_back("Naked Quads");
+    ApplyNakedSingles(grid);
+    ApplyHiddenSingles(grid);
+    total++;
+    changed = true;
+  }
+
+  // Hidden Quads — apply until stable
+  while (ApplyHiddenQuads(grid) > 0) {
+    if (score) score->hiddenQuads += GetTechniqueScore(SolvingTechnique::kHiddenQuad);
+    if (techniques) techniques->push_back("Hidden Quads");
+    ApplyNakedSingles(grid);
+    ApplyHiddenSingles(grid);
+    total++;
+    changed = true;
+  }
+
+  // Block/Block Interaction — apply until stable
+  while (ApplyBlockBlockInteraction(grid) > 0) {
+    if (score) score->blockBlockInteractions += GetTechniqueScore(SolvingTechnique::kBlockBlockInteraction);
+    if (techniques) techniques->push_back("Block/Block");
+    ApplyNakedSingles(grid);
+    ApplyHiddenSingles(grid);
+    total++;
+    changed = true;
+  }
+
+  // X-Wing — apply until stable
+  while (ApplyXWing(grid) > 0) {
+    if (score) score->xWings += GetTechniqueScore(SolvingTechnique::kXWing);
+    if (techniques) techniques->push_back("X-Wing");
+    ApplyNakedSingles(grid);
+    ApplyHiddenSingles(grid);
+    total++;
+    changed = true;
+  }
+
+  // Unique Rectangle — apply until stable
+  while (ApplyUniqueRectangle(grid) > 0) {
+    if (score) score->uniqueRectangles += GetTechniqueScore(SolvingTechnique::kUniqueRectangle);
+    if (techniques) techniques->push_back("Unique Rectangle");
+    ApplyNakedSingles(grid);
+    ApplyHiddenSingles(grid);
+    total++;
+    changed = true;
+  }
+
+  // Y-Wing — apply until stable
+  while (ApplyYWing(grid) > 0) {
+    if (score) score->yWings += GetTechniqueScore(SolvingTechnique::kYWing);
+    if (techniques) techniques->push_back("Y-Wing");
+    ApplyNakedSingles(grid);
+    ApplyHiddenSingles(grid);
+    total++;
+    changed = true;
+  }
+
+  // Simple Colouring — apply until stable
+  while (ApplySimpleColoring(grid) > 0) {
+    if (score) score->simpleColourings += GetTechniqueScore(SolvingTechnique::kSimpleColouring);
+    if (techniques) techniques->push_back("Simple Colouring");
+    ApplyNakedSingles(grid);
+    ApplyHiddenSingles(grid);
+    total++;
+    changed = true;
+  }
+
+  // Swordfish — apply until stable
+  while (ApplySwordfish(grid) > 0) {
+    if (score) score->swordfishes += GetTechniqueScore(SolvingTechnique::kSwordfish);
+    if (techniques) techniques->push_back("Swordfish");
+    ApplyNakedSingles(grid);
+    ApplyHiddenSingles(grid);
+    total++;
+    changed = true;
+  }
+
+  // XYZ-Wing — apply until stable
+  while (ApplyXYZWing(grid) > 0) {
+    if (score) score->xyzWings += GetTechniqueScore(SolvingTechnique::kXYZWing);
+    if (techniques) techniques->push_back("XYZ-Wing");
+    ApplyNakedSingles(grid);
+    ApplyHiddenSingles(grid);
+    total++;
+    changed = true;
+  }
+
+  // XY-Chain — apply until stable
+  while (ApplyXYChain(grid) > 0) {
+    if (score) score->xyChains += GetTechniqueScore(SolvingTechnique::kXYChain);
+    if (techniques) techniques->push_back("XY-Chain");
+    ApplyNakedSingles(grid);
+    ApplyHiddenSingles(grid);
+    total++;
+    changed = true;
+  }
+
+  // Jellyfish — apply until stable
+  while (ApplyJellyfish(grid) > 0) {
+    if (score) score->jellyfishes += GetTechniqueScore(SolvingTechnique::kJellyfish);
+    if (techniques) techniques->push_back("Jellyfish");
+    ApplyNakedSingles(grid);
+    ApplyHiddenSingles(grid);
+    total++;
+    changed = true;
+  }
+
+  // Forcing Chains — apply until stable with exhaustive propagation
+  while (ApplyForcingChains(grid) > 0) {
+    if (score) score->forcingChains += GetTechniqueScore(SolvingTechnique::kForcingChains);
+    if (techniques) techniques->push_back("Forcing Chains");
+    while (ApplyNakedSingles(grid) > 0 || ApplyHiddenSingles(grid) > 0) {
+      // Keep propagating singles
+    }
+    total++;
+    changed = true;
+  }
+
+  return total;
+}
+
 // Comprehensive solver using all available techniques
 bool SolveComprehensive(Puzzle& puzzle) {
   Grid grid = BuildGrid(puzzle);
@@ -2910,150 +3116,7 @@ bool SolveComprehensive(Puzzle& puzzle) {
   int iteration = 0;
 
   while (iteration < maxIterations) {
-    bool changed = false;
-
-    // Apply naked singles until stable
-    while (ApplyNakedSingles(grid) > 0) {
-      changed = true;
-    }
-
-    // Apply hidden singles until stable
-    while (ApplyHiddenSingles(grid) > 0) {
-      changed = true;
-    }
-
-    // Apply pointing pairs until stable
-    while (ApplyPointingPairs(grid) > 0) {
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Apply box/line reduction until stable
-    while (ApplyBoxLineReduction(grid) > 0) {
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Apply naked pairs until stable
-    while (ApplyNakedPairs(grid) > 0) {
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Apply hidden pairs until stable
-    while (ApplyHiddenPairs(grid) > 0) {
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Apply naked triples until stable
-    while (ApplyNakedTriples(grid) > 0) {
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Apply hidden triples until stable
-    while (ApplyHiddenTriples(grid) > 0) {
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Apply naked quads until stable
-    while (ApplyNakedQuads(grid) > 0) {
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Apply hidden quads until stable
-    while (ApplyHiddenQuads(grid) > 0) {
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Apply block/block interaction until stable
-    while (ApplyBlockBlockInteraction(grid) > 0) {
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Apply X-Wing until stable
-    while (ApplyXWing(grid) > 0) {
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Apply Unique Rectangle until stable
-    while (ApplyUniqueRectangle(grid) > 0) {
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Apply Y-Wing until stable
-    while (ApplyYWing(grid) > 0) {
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Apply Simple Colouring until stable
-    while (ApplySimpleColoring(grid) > 0) {
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Apply Swordfish until stable
-    while (ApplySwordfish(grid) > 0) {
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Apply XYZ-Wing until stable
-    while (ApplyXYZWing(grid) > 0) {
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Apply XY-Chain until stable
-    while (ApplyXYChain(grid) > 0) {
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Apply Jellyfish until stable
-    while (ApplyJellyfish(grid) > 0) {
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Apply Forcing Chains until stable
-    while (ApplyForcingChains(grid) > 0) {
-      while (ApplyNakedSingles(grid) > 0 || ApplyHiddenSingles(grid) > 0) {
-        // Keep propagating
-      }
-      changed = true;
-    }
-
-    // If no progress in this iteration, we're done
-    if (!changed) {
-      break;
-    }
-
+    if (RunOnePass(grid) == 0) break;
     iteration++;
   }
 
@@ -3138,167 +3201,7 @@ PuzzleScore SolveAndScoreDetailed(const Puzzle& puzzle) {
   ApplyAutoPencil(grid);
 
   for (int i = 0; i < kMaxIterations; ++i) {
-    // Use same algorithm as SolveComprehensive: exhaust each technique before moving on
-    bool changed = false;
-
-    // Naked Singles — apply until stable
-    while (ApplyNakedSingles(grid) > 0) {
-      score.nakedSingles += GetTechniqueScore(SolvingTechnique::kNakedSingle);
-      changed = true;
-    }
-
-    // Hidden Singles — apply until stable
-    while (ApplyHiddenSingles(grid) > 0) {
-      score.hiddenSingles += GetTechniqueScore(SolvingTechnique::kHiddenSingle);
-      changed = true;
-    }
-
-    // Pointing Pairs — apply until stable
-    while (ApplyPointingPairs(grid) > 0) {
-      score.pointingPairs += GetTechniqueScore(SolvingTechnique::kPointingPair);
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Box/Line Reduction — apply until stable
-    while (ApplyBoxLineReduction(grid) > 0) {
-      score.boxLineReductions += GetTechniqueScore(SolvingTechnique::kBoxLineReduction);
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Naked Pairs — apply until stable
-    while (ApplyNakedPairs(grid) > 0) {
-      score.nakedPairs += GetTechniqueScore(SolvingTechnique::kNakedPair);
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Hidden Pairs — apply until stable
-    while (ApplyHiddenPairs(grid) > 0) {
-      score.hiddenPairs += GetTechniqueScore(SolvingTechnique::kHiddenPair);
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Naked Triples — apply until stable
-    while (ApplyNakedTriples(grid) > 0) {
-      score.nakedTriples += GetTechniqueScore(SolvingTechnique::kNakedTriple);
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Hidden Triples — apply until stable
-    while (ApplyHiddenTriples(grid) > 0) {
-      score.hiddenTriples += GetTechniqueScore(SolvingTechnique::kHiddenTriple);
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Naked Quads — apply until stable
-    while (ApplyNakedQuads(grid) > 0) {
-      score.nakedQuads += GetTechniqueScore(SolvingTechnique::kNakedQuad);
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Hidden Quads — apply until stable
-    while (ApplyHiddenQuads(grid) > 0) {
-      score.hiddenQuads += GetTechniqueScore(SolvingTechnique::kHiddenQuad);
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Block/Block Interaction — apply until stable
-    while (ApplyBlockBlockInteraction(grid) > 0) {
-      score.blockBlockInteractions += GetTechniqueScore(SolvingTechnique::kBlockBlockInteraction);
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // X-Wing — apply until stable
-    while (ApplyXWing(grid) > 0) {
-      score.xWings += GetTechniqueScore(SolvingTechnique::kXWing);
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Unique Rectangle — apply until stable
-    while (ApplyUniqueRectangle(grid) > 0) {
-      score.uniqueRectangles += GetTechniqueScore(SolvingTechnique::kUniqueRectangle);
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Y-Wing — apply until stable
-    while (ApplyYWing(grid) > 0) {
-      score.yWings += GetTechniqueScore(SolvingTechnique::kYWing);
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Simple Colouring — apply until stable
-    while (ApplySimpleColoring(grid) > 0) {
-      score.simpleColourings += GetTechniqueScore(SolvingTechnique::kSimpleColouring);
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Swordfish — apply until stable
-    while (ApplySwordfish(grid) > 0) {
-      score.swordfishes += GetTechniqueScore(SolvingTechnique::kSwordfish);
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // XYZ-Wing — apply until stable
-    while (ApplyXYZWing(grid) > 0) {
-      score.xyzWings += GetTechniqueScore(SolvingTechnique::kXYZWing);
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // XY-Chain — apply until stable
-    while (ApplyXYChain(grid) > 0) {
-      score.xyChains += GetTechniqueScore(SolvingTechnique::kXYChain);
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Jellyfish — apply until stable
-    while (ApplyJellyfish(grid) > 0) {
-      score.jellyfishes += GetTechniqueScore(SolvingTechnique::kJellyfish);
-      ApplyNakedSingles(grid);
-      ApplyHiddenSingles(grid);
-      changed = true;
-    }
-
-    // Forcing Chains — apply until stable
-    while (ApplyForcingChains(grid) > 0) {
-      score.forcingChains += GetTechniqueScore(SolvingTechnique::kForcingChains);
-      while (ApplyNakedSingles(grid) > 0 || ApplyHiddenSingles(grid) > 0) {
-        // Keep propagating
-      }
-      changed = true;
-    }
-
-    if (!changed) break;  // No technique made progress
+    if (RunOnePass(grid, &score) == 0) break;
   }
 
   score.totalScore = score.nakedSingles + score.hiddenSingles + score.pointingPairs +

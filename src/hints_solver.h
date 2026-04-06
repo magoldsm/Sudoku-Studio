@@ -68,6 +68,13 @@ int ApplyForcingChains(Grid& grid);
 // Repeats single-pass placement until stable; returns total placements.
 int AutoSolveNakedSingles(Grid& grid);
 int AutoSolveHiddenSingles(Grid& grid);
+// Applies all 20 techniques in priority order for one pass.
+// Returns number of technique firings (0 = no progress this pass).
+// If score is non-null, accumulates difficulty score per technique.
+// If techniques is non-null, records name of each technique that fired.
+int RunOnePass(Grid& grid,
+               PuzzleScore* score = nullptr,
+               std::vector<const char*>* techniques = nullptr);
 // Comprehensive solver using all available solving techniques
 bool SolveComprehensive(Puzzle& puzzle);
 // Solves puzzle and returns total difficulty score
