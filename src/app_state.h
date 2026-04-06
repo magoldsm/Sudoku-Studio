@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 #include "sudoku_core.h"
-#include "hints_solver.h"
 
 namespace sudoku {
 

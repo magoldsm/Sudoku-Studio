@@ -126,6 +126,9 @@ Grid BuildGrid(const Puzzle& puzzle);
 // Solves from givens only; returns false when givens are invalid or unsatisfiable.
 bool ComputeSolutionFromGivens(const Puzzle& givens, Puzzle& solution);
 
+// True if digit can be placed at (row, col) without violating Sudoku rules (on raw Puzzle).
+bool IsSafeInPuzzle(const Puzzle& board, int row, int col, int digit);
+
 // True if two coordinates share row, column, or box.
 bool SharesUnit(int r1, int c1, int r2, int c2);
 bool IsConflict(const Grid& grid, int row, int col, int value);
@@ -135,5 +138,30 @@ bool IsSolved(const Grid& grid);
 std::bitset<9> ComputeCandidates(const Grid& grid, int row, int col);
 // Clears the placed digit from all unsolved peers in row/column/box.
 void RemoveDigitFromPeerPencils(Grid& grid, int row, int col, int digit);
+
+// Puzzle scoring details
+struct PuzzleScore {
+  int totalScore = 0;
+  int nakedSingles = 0;
+  int hiddenSingles = 0;
+  int pointingPairs = 0;
+  int boxLineReductions = 0;
+  int nakedPairs = 0;
+  int hiddenPairs = 0;
+  int nakedTriples = 0;
+  int hiddenTriples = 0;
+  int nakedQuads = 0;
+  int hiddenQuads = 0;
+  int blockBlockInteractions = 0;
+  int xWings = 0;
+  int uniqueRectangles = 0;
+  int yWings = 0;
+  int simpleColourings = 0;
+  int swordfishes = 0;
+  int xyzWings = 0;
+  int xyChains = 0;
+  int jellyfishes = 0;
+  int forcingChains = 0;
+};
 
 }  // namespace sudoku

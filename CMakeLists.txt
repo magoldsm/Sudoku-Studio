@@ -48,6 +48,7 @@ target_link_libraries(imgui_lib PUBLIC glfw OpenGL::GL)
 add_executable(sudoku_ui
   src/main.cpp
   src/sudoku_core.cpp
+  src/puzzle_generator.cpp
   src/hints_solver.cpp
   src/hints_candidates.cpp
   src/ui_helpers.cpp

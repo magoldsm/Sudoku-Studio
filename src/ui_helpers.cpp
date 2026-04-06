@@ -31,7 +31,7 @@ void DrawTechniquePanel(const Hint& currentHint, float width) {
     int level;
   };
 
-  static const std::array<TechniqueEntry, 18> kTechniques = {{
+  static const std::array<TechniqueEntry, 20> kTechniques = {{
       {"Naked Single", 1},
       {"Hidden Single", 1},
       {"Pointing Pair/Triple", 2},
@@ -50,6 +50,8 @@ void DrawTechniquePanel(const Hint& currentHint, float width) {
       {"Swordfish", 6},
       {"XYZ-Wing", 6},
       {"XY-Chain", 7},
+      {"Jellyfish", 7},
+      {"Forcing Chains", 8},
   }};
 
   // If width is 0, use full available width; otherwise use specified width
@@ -81,8 +83,6 @@ void DrawTechniquePanel(const Hint& currentHint, float width) {
     }
   }
 
-  ImGui::TextDisabled("[7] Jellyfish");
-  ImGui::TextDisabled("[8] Forcing Chains");
   ImGui::EndChild();
 }
 

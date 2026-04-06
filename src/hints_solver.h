@@ -29,31 +29,6 @@ enum class SolvingTechnique {
   kForcingChains = 20,
 };
 
-// Puzzle scoring details
-struct PuzzleScore {
-  int totalScore = 0;
-  int nakedSingles = 0;
-  int hiddenSingles = 0;
-  int pointingPairs = 0;
-  int boxLineReductions = 0;
-  int nakedPairs = 0;
-  int hiddenPairs = 0;
-  int nakedTriples = 0;
-  int hiddenTriples = 0;
-  int nakedQuads = 0;
-  int hiddenQuads = 0;
-  int blockBlockInteractions = 0;
-  int xWings = 0;
-  int uniqueRectangles = 0;
-  int yWings = 0;
-  int simpleColourings = 0;
-  int swordfishes = 0;
-  int xyzWings = 0;
-  int xyChains = 0;
-  int jellyfishes = 0;
-  int forcingChains = 0;
-};
-
 int GetTechniqueScore(SolvingTechnique technique);
 
 // Returns the next supported hint in difficulty order.
