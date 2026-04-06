@@ -1237,7 +1237,6 @@ int main(int argc, char** argv) {
                         "Solved ", " hidden singles", "No hidden singles found", 300);
     }
     if (requestHint) {
-      uiState.mode = InputMode::kDigit;  // Exit color mode
       if (uiState.currentHint.revealPhase == 0 || uiState.currentHint.revealPhase >= 3) {
         uiState.currentHint = GenerateHint(puzzleState.grid);
         uiState.currentHint.revealPhase = 1;
