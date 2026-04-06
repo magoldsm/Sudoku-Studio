@@ -447,6 +447,20 @@ void DrawBoard(UIState& uiState,
           ClearHint(uiState);
         }
       }
+      // In candidate color mode, color a candidate when clicked
+      if (uiState.mode == InputMode::kCandidateColor && cellAlreadySelected && !clickedCell.fixed && clickedCell.value == 0) {
+        const float localX = mouse.x - (origin.x + static_cast<float>(clickedCol) * kCellSize);
+        const float localY = mouse.y - (origin.y + static_cast<float>(clickedRow) * kCellSize);
+        const int subCol = std::clamp(static_cast<int>((localX / kCellSize) * 3.0f), 0, 2);
+        const int subRow = std::clamp(static_cast<int>((localY / kCellSize) * 3.0f), 0, 2);
+        const int candidateDigit = subRow * 3 + subCol + 1;
+        // Color this candidate with the active color (replace any highlight)
+        if (uiState.activeColor > 0) {
+          PushUndoState(uiState.undoHistory, puzzleState.grid);
+          clickedCell.candidateColors[candidateDigit] = uiState.activeColor;
+          ClearHint(uiState);
+        }
+      }
     }
   }
 
@@ -550,7 +564,17 @@ void DrawBoard(UIState& uiState,
 
         const ImVec2 noteSize =
             noteFont->CalcTextSizeA(noteFont->FontSize, FLT_MAX, 0.0f, text.c_str());
-        if (highlightDigit == d || (uiState.highlightPairs && puzzleState.grid[r][c].pencil.count() == 2)) {
+
+        // Check if this candidate has a color assigned
+        int candidateColor = puzzleState.grid[r][c].candidateColors[d];
+        if (candidateColor > 0 && candidateColor <= 9) {
+          // Draw colored background for this candidate
+          draw->AddRectFilled(ImVec2(notePos.x - 2.0f, notePos.y - 1.0f),
+                              ImVec2(notePos.x + noteSize.x + 2.0f, notePos.y + noteSize.y + 1.0f),
+                              kTagColors[candidateColor], kPencilMarkBorderRadius);
+          // Use dark text on colored background
+          noteColor = IM_COL32(0, 0, 0, 255);
+        } else if (highlightDigit == d || (uiState.highlightPairs && puzzleState.grid[r][c].pencil.count() == 2)) {
           draw->AddRectFilled(ImVec2(notePos.x - 2.0f, notePos.y - 1.0f),
                               ImVec2(notePos.x + noteSize.x + 2.0f, notePos.y + noteSize.y + 1.0f),
                               kPencilHighlightBackgroundColor, kPencilMarkBorderRadius);
@@ -860,7 +884,8 @@ int main(int argc, char** argv) {
   GLFWcursor* cursorPen = nullptr;
   GLFWcursor* cursorPencil = nullptr;
   GLFWcursor* cursorRainbow = nullptr;
-  GLuint texPen = 0, texPencil = 0, texRainbow = 0;
+  GLFWcursor* cursorRainbowPencil = nullptr;
+  GLuint texPen = 0, texPencil = 0, texRainbow = 0, texRainbowPencil = 0;
   bool cursorsInitialized = false;
 
   while (!glfwWindowShouldClose(window)) {
@@ -882,6 +907,7 @@ int main(int argc, char** argv) {
       static unsigned char penData[kIconSize * kIconSize * 4] = {};
       static unsigned char pencilData[kIconSize * kIconSize * 4] = {};
       static unsigned char rainbowData[kIconSize * kIconSize * 4] = {};
+      static unsigned char rainbowPencilData[kIconSize * kIconSize * 4] = {};
 
       // Load Pen.rgba
       std::string penPath = assetDir + "Pen.rgba";
@@ -913,14 +939,26 @@ int main(int argc, char** argv) {
         if (debugLog) fprintf(debugLog, "Failed to open: %s\n", rainbowPath.c_str());
       }
 
+      // Load RainbowPencil.rgba
+      std::string rainbowPencilPath = assetDir + "RainbowPencil.rgba";
+      if (FILE* f = fopen(rainbowPencilPath.c_str(), "rb")) {
+        size_t bytesRead = fread(rainbowPencilData, 1, kIconBytes, f);
+        fclose(f);
+        if (debugLog) fprintf(debugLog, "Loaded RainbowPencil.rgba: %zu bytes\n", bytesRead);
+      } else {
+        if (debugLog) fprintf(debugLog, "Failed to open: %s\n", rainbowPencilPath.c_str());
+      }
+
       if (debugLog) fclose(debugLog);
 
       GLFWimage penImg    = { kIconSize, kIconSize, penData };
       GLFWimage pencilImg = { kIconSize, kIconSize, pencilData };
       GLFWimage rainbowImg= { kIconSize, kIconSize, rainbowData };
+      GLFWimage rainbowPencilImg = { kIconSize, kIconSize, rainbowPencilData };
       cursorPen     = glfwCreateCursor(&penImg,     6, 29);   // hotspot: nib tip (32x32)
       cursorPencil  = glfwCreateCursor(&pencilImg,  1, 31);  // hotspot: pencil tip (32x32)
       cursorRainbow = glfwCreateCursor(&rainbowImg, 16, 16);  // hotspot: center (32x32)
+      cursorRainbowPencil = glfwCreateCursor(&rainbowPencilImg, 1, 31);  // hotspot: pencil tip (32x32)
 
       if (debugLog) {
         fprintf(debugLog, "Cursor creation:\n");
@@ -932,6 +970,7 @@ int main(int argc, char** argv) {
       texPen     = CreateGLTexture(penData,     kIconSize);
       texPencil  = CreateGLTexture(pencilData,  kIconSize);
       texRainbow = CreateGLTexture(rainbowData, kIconSize);
+      texRainbowPencil = CreateGLTexture(rainbowPencilData, kIconSize);
 
       cursorsInitialized = true;
     }
@@ -1047,6 +1086,9 @@ int main(int argc, char** argv) {
         if (ImGui::MenuItem("Color", "R", uiState.mode == InputMode::kColor)) {
           uiState.mode = InputMode::kColor;
         }
+        if (ImGui::MenuItem("Candidate Color", "T", uiState.mode == InputMode::kCandidateColor)) {
+          uiState.mode = InputMode::kCandidateColor;
+        }
         ImGui::EndMenu();
       }
       ImGui::EndMainMenuBar();
@@ -1108,6 +1150,8 @@ int main(int argc, char** argv) {
     modeBtn("##mode_pencil", texPencil,  InputMode::kPencil);
     ImGui::SameLine(0.0f, 4.0f);
     modeBtn("##mode_color",  texRainbow, InputMode::kColor);
+    ImGui::SameLine(0.0f, 4.0f);
+    modeBtn("##mode_candidateColor", texRainbowPencil, InputMode::kCandidateColor);
 
     if (ImGui::Button("Auto Pencil", ImVec2(140, 34))) {
       requestAutoPencil = true;
@@ -1151,6 +1195,9 @@ int main(int argc, char** argv) {
     }
     if (ImGui::IsKeyPressed(ImGuiKey_R)) {
       uiState.mode = InputMode::kColor;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_T)) {
+      uiState.mode = InputMode::kCandidateColor;
     }
     if (ImGui::IsKeyPressed(ImGuiKey_P)) {
       requestAutoPencil = true;
@@ -1412,6 +1459,9 @@ int main(int argc, char** argv) {
         case InputMode::kColor:
           glfwSetCursor(window, cursorRainbow);
           break;
+        case InputMode::kCandidateColor:
+          glfwSetCursor(window, cursorRainbowPencil);
+          break;
       }
     } else {
       // Show default arrow cursor when not over board
@@ -1662,9 +1712,11 @@ int main(int argc, char** argv) {
   if (cursorPen) glfwDestroyCursor(cursorPen);
   if (cursorPencil) glfwDestroyCursor(cursorPencil);
   if (cursorRainbow) glfwDestroyCursor(cursorRainbow);
+  if (cursorRainbowPencil) glfwDestroyCursor(cursorRainbowPencil);
   if (texPen) glDeleteTextures(1, &texPen);
   if (texPencil) glDeleteTextures(1, &texPencil);
   if (texRainbow) glDeleteTextures(1, &texRainbow);
+  if (texRainbowPencil) glDeleteTextures(1, &texRainbowPencil);
 
   glfwDestroyWindow(window);
   glfwTerminate();

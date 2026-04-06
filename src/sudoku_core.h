@@ -22,6 +22,7 @@ enum class InputMode {
   kDigit,
   kPencil,
   kColor,
+  kCandidateColor,
 };
 
 enum class Difficulty {
@@ -56,6 +57,7 @@ struct Cell {
   int value = 0;
   std::bitset<9> pencil;
   int colorTag = 0;
+  std::array<int, 10> candidateColors = {};  // candidateColors[d] = color for digit d (0 = no color)
   bool fixed = false;
 };
 
