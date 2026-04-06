@@ -677,19 +677,19 @@ void DrawBoard(UIState& uiState,
 // Returns the directory containing the running executable, with trailing slash.
 static std::string GetExeDir() {
 #ifdef _WIN32
-  char buf[MAX_PATH];
+  char buf[MAX_PATH] = {0};
   DWORD len = GetModuleFileNameA(nullptr, buf, MAX_PATH);
   if (len == 0) return "./";
   std::string path(buf, len);
-  auto slash = path.rfind('\\');
+  size_t slash = path.rfind('\\');
   return (slash != std::string::npos) ? path.substr(0, slash + 1) : "./";
 #else
-  char buf[4096];
-  ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+  char buf[4096] = {0};
+  long len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
   if (len <= 0) return "./";
   buf[len] = '\0';
   std::string path(buf);
-  auto slash = path.rfind('/');
+  size_t slash = path.rfind('/');
   return (slash != std::string::npos) ? path.substr(0, slash + 1) : "./";
 #endif
 }
