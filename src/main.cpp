@@ -700,17 +700,6 @@ static std::string GetExeDir() {
 
 using namespace sudoku;
 
-// Forward declaration
-int main(int argc, char** argv);
-
-// WinMain stub for /SUBSYSTEM:WINDOWS (hides console on Windows)
-#ifdef _WIN32
-#include <windows.h>
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-  return main(__argc, __argv);
-}
-#endif
-
 // Load window icon from PNG file
 int main(int argc, char** argv) {
   InitExeDir(argv[0]);  // Initialize exe directory for asset loading
