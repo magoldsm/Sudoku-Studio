@@ -987,6 +987,8 @@ Hint DetectSimpleColoring(const CandidateGrid& candidates) {
 }
 
 Hint DetectXYChain(const CandidateGrid& candidates) {
+  // Step 1: Gather all bivalue cells (cells with exactly 2 candidates)
+  // These are the only cells that can participate in an XY-chain
   std::vector<HintCell> bivalueCells;
   for (int row = 0; row < kGridSize; ++row) {
     for (int col = 0; col < kGridSize; ++col) {
@@ -998,16 +1000,19 @@ Hint DetectXYChain(const CandidateGrid& candidates) {
 
   const int n = static_cast<int>(bivalueCells.size());
 
+  // State for depth-first search of chains
   struct State {
-    int cellIdx;
-    int exitDigit;  // digit this cell passes forward to the next link
-    std::vector<int> chainIndices;
+    int cellIdx;                      // Index of current cell in the chain
+    int exitDigit;                    // The digit flowing FROM this cell to the next
+    std::vector<int> chainIndices;    // Path of cell indices in chain so far
   };
 
+  // Step 2: Try each bivalue cell as the starting point
   for (int startIdx = 0; startIdx < n; ++startIdx) {
     const HintCell& startCell = bivalueCells[startIdx];
     const std::bitset<9> startMask = candidates[startCell.row][startCell.col];
 
+    // Extract the two digits from the start cell
     int digitsInStart[2];
     int di = 0;
     for (int d = 0; d < 9 && di < 2; ++d) {
@@ -1016,11 +1021,13 @@ Hint DetectXYChain(const CandidateGrid& candidates) {
       }
     }
 
-    // Try each digit as the one "held back" at the start (the elimination digit).
+    // Step 3: Try each digit as the "held digit" (the one we'll eliminate)
+    // The other digit becomes the "flowing digit" that travels through the chain
     for (int pass = 0; pass < 2; ++pass) {
-      const int heldDigit = digitsInStart[pass];
-      const int startExit = digitsInStart[1 - pass];
+      const int heldDigit = digitsInStart[pass];        // Stays at start, must close the chain
+      const int startExit = digitsInStart[1 - pass];    // Flows from start to next cell
 
+      // Step 4: Depth-first search to build chains
       std::vector<State> stack;
       stack.push_back({startIdx, startExit, {startIdx}});
 
@@ -1030,7 +1037,9 @@ Hint DetectXYChain(const CandidateGrid& candidates) {
 
         const HintCell& currentCell = bivalueCells[state.cellIdx];
 
+        // Step 5: Try to extend chain by finding the next bivalue cell
         for (int nextIdx = 0; nextIdx < n; ++nextIdx) {
+          // Don't revisit cells already in the chain
           bool inChain = false;
           for (int ci : state.chainIndices) {
             if (ci == nextIdx) {
@@ -1045,14 +1054,20 @@ Hint DetectXYChain(const CandidateGrid& candidates) {
           const HintCell& nextCell = bivalueCells[nextIdx];
           const std::bitset<9> nextMask = candidates[nextCell.row][nextCell.col];
 
+          // Step 6: Check if next cell contains the flowing digit
+          // (it must accept the digit we're passing to it)
           if (!nextMask.test(state.exitDigit)) {
             continue;
           }
+
+          // Step 7: Check if next cell shares a unit with current cell
+          // (chain links must see each other)
           if (!SharesUnit(currentCell.row, currentCell.col, nextCell.row, nextCell.col)) {
             continue;
           }
 
-          // The digit nextCell exits with is its other candidate.
+          // Step 8: Determine what digit flows OUT from the next cell
+          // It's the OTHER candidate (not the one flowing in)
           int nextExit = -1;
           for (int d = 0; d < 9; ++d) {
             if (d != state.exitDigit && nextMask.test(d)) {
@@ -1064,14 +1079,16 @@ Hint DetectXYChain(const CandidateGrid& candidates) {
           std::vector<int> newChain = state.chainIndices;
           newChain.push_back(nextIdx);
 
+          // Step 9: Check if the chain closes
+          // Chain closes when the flowing digit becomes the held digit at the end cell
           if (nextExit == heldDigit) {
-            // Valid chain: startCell and nextCell both contain heldDigit.
-            // Y-Wing already handles 3-cell chains; require >= 4 here to avoid
-            // relabelling cases already caught by the Y-Wing detector.
+            // Chain is complete: heldDigit at start and end, flowing digit traveled through middle
+            // Require at least 4 cells to avoid overlap with Y-Wing (which is 3-cell)
             if (static_cast<int>(newChain.size()) < 4) {
               continue;
             }
 
+            // Step 10: Collect the chain cells for display/coloring
             std::vector<HintCell> affected;
             std::vector<HintCell> chainCells;
             for (int ci : newChain) {
@@ -1080,12 +1097,18 @@ Hint DetectXYChain(const CandidateGrid& candidates) {
               chainCells.push_back(chainCell);
             }
 
+            // Step 11: Find elimination targets
+            // The held digit can be eliminated from any cell that sees BOTH start AND end
+            // (because the held digit must exist in one of those two endpoints)
             bool hasElimination = false;
             for (int row = 0; row < kGridSize; ++row) {
               for (int col = 0; col < kGridSize; ++col) {
+                // Skip cells that don't contain the held digit
                 if (!candidates[row][col].test(heldDigit)) {
                   continue;
                 }
+
+                // Skip cells that are part of the chain itself
                 bool partOfChain = false;
                 for (int ci : newChain) {
                   if (bivalueCells[ci].row == row && bivalueCells[ci].col == col) {
@@ -1096,6 +1119,8 @@ Hint DetectXYChain(const CandidateGrid& candidates) {
                 if (partOfChain) {
                   continue;
                 }
+
+                // This cell can see both start and end: held digit can be eliminated
                 if (SharesUnit(row, col, startCell.row, startCell.col) &&
                     SharesUnit(row, col, nextCell.row, nextCell.col)) {
                   AddUniqueCell(affected, row, col);
@@ -1104,12 +1129,13 @@ Hint DetectXYChain(const CandidateGrid& candidates) {
               }
             }
 
+            // Step 12: Return the hint if we found eliminations
             if (hasElimination) {
               return MakeHint("XY-Chain", affected, {heldDigit + 1}, {startCell, nextCell},
                               chainCells);
             }
           } else {
-            // Chain not yet closed — extend it.
+            // Chain not yet closed — continue searching by extending with next cell
             stack.push_back({nextIdx, nextExit, std::move(newChain)});
           }
         }
