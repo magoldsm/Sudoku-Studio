@@ -45,7 +45,7 @@ target_include_directories(imgui_lib PUBLIC
 
 target_link_libraries(imgui_lib PUBLIC glfw OpenGL::GL)
 
-add_executable(sudoku_ui
+add_executable(sudoku_ui WIN32
   src/main.cpp
   src/sudoku_core.cpp
   src/puzzle_generator.cpp
@@ -58,6 +58,14 @@ add_executable(sudoku_ui
   $<$<PLATFORM_ID:Windows>:sudoku.rc>
 )
 target_link_libraries(sudoku_ui PRIVATE imgui_lib)
+
+# Copy assets to build output directory (for development builds)
+add_custom_command(TARGET sudoku_ui POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${CMAKE_SOURCE_DIR}/assets"
+    "$<TARGET_FILE_DIR:sudoku_ui>/assets"
+  COMMENT "Copying assets to build directory"
+)
 
 if(UNIX AND NOT APPLE)
   target_link_libraries(sudoku_ui PRIVATE dl pthread)
@@ -94,8 +102,9 @@ set(CPACK_NSIS_DELETE_ICONS_EXTRA
   "RMDir '$SMPROGRAMS\\\\Sudoku Studio'"
 )
 
-# Install rules for help files
+# Install rules for help files and assets
 install(DIRECTORY docs/help/ DESTINATION docs/help)
+install(DIRECTORY assets/ DESTINATION bin)
 install(TARGETS sudoku_ui DESTINATION bin)
 
 include(CPack)

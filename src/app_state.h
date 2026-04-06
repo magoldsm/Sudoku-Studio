@@ -23,6 +23,7 @@ struct UIState {
   int activeColor = 1;
   bool highlightPairs = false;
   bool showWrongEntrySlash = true;
+  bool autoSolveNakedSingles = false;
   InputMode mode = InputMode::kDigit;
   Difficulty selectedDifficulty = Difficulty::kHard;
 

@@ -105,7 +105,7 @@ void DrawColorTagPanel(Grid& grid,
     const ImVec4 c = ImGui::ColorConvertU32ToFloat4(tagColors[tag]);
     ImGui::PushStyleColor(ImGuiCol_Button, c);
 
-    if (ImGui::Button(std::to_string(tag).c_str(), ImVec2(compactTagWidth, compactTagHeight))) {
+    if (ImGui::Button(("##ctag_" + std::to_string(tag)).c_str(), ImVec2(compactTagWidth, compactTagHeight))) {
       activeColor = tag;
       mode = InputMode::kColor;  // Auto-switch to color mode when color is clicked
     }

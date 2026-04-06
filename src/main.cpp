@@ -14,6 +14,12 @@
 #include <thread>
 #include <vector>
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
 #include <GLFW/glfw3.h>
 
 #include "app_state.h"
@@ -427,12 +433,15 @@ void DrawBoard(UIState& uiState,
       }
       // Don't select the cell in color mode
     } else {
-      // Non-color modes: always select the cell
+      // Non-color modes: check if cell was already selected before updating selection
+      const bool cellAlreadySelected =
+          (clampedRow == uiState.selectedRow && clampedCol == uiState.selectedCol);
       uiState.selectedCol = clampedCol;
       uiState.selectedRow = clampedRow;
 
       Cell& clickedCell = puzzleState.grid[uiState.selectedRow][uiState.selectedCol];
-      if (uiState.mode == InputMode::kPencil && !clickedCell.fixed && clickedCell.value == 0) {
+      // In pencil mode, only toggle pencil marks if the cell was already selected
+      if (uiState.mode == InputMode::kPencil && cellAlreadySelected && !clickedCell.fixed && clickedCell.value == 0) {
         const float localX = mouse.x - (origin.x + static_cast<float>(clickedCol) * kCellSize);
         const float localY = mouse.y - (origin.y + static_cast<float>(clickedRow) * kCellSize);
         const int subCol = std::clamp(static_cast<int>((localX / kCellSize) * 3.0f), 0, 2);
@@ -665,6 +674,26 @@ void DrawBoard(UIState& uiState,
   DrawColorTagPanel(puzzleState.grid, uiState.activeColor, uiState.mode, kTagColors, uiState.showPositionDigit, uiState.showEffectDigit, uiState.highlightPairs);
 }
 
+// Returns the directory containing the running executable, with trailing slash.
+static std::string GetExeDir() {
+#ifdef _WIN32
+  char buf[MAX_PATH];
+  DWORD len = GetModuleFileNameA(nullptr, buf, MAX_PATH);
+  if (len == 0) return "./";
+  std::string path(buf, len);
+  auto slash = path.rfind('\\');
+  return (slash != std::string::npos) ? path.substr(0, slash + 1) : "./";
+#else
+  char buf[4096];
+  ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+  if (len <= 0) return "./";
+  buf[len] = '\0';
+  std::string path(buf);
+  auto slash = path.rfind('/');
+  return (slash != std::string::npos) ? path.substr(0, slash + 1) : "./";
+#endif
+}
+
 }  // namespace sudoku
 
 using namespace sudoku;
@@ -820,18 +849,54 @@ int main(int argc, char** argv) {
   uiState.statusMessage = "Menu/toolbar enabled. Ctrl+Z undo, P auto-pencil, K naked singles, H hidden singles";
   uiState.statusFrames = 480;
 
-  // Create standard cursors for different modes (lazy initialization)
-  GLFWcursor* cursorArrow = nullptr;
-  GLFWcursor* cursorCrosshair = nullptr;
-  GLFWcursor* cursorHand = nullptr;
+  // Create cursors and button icon textures from PNG images (lazy initialization)
+  GLFWcursor* cursorPen = nullptr;
+  GLFWcursor* cursorPencil = nullptr;
+  GLFWcursor* cursorRainbow = nullptr;
+  GLuint texPen = 0, texPencil = 0, texRainbow = 0;
   bool cursorsInitialized = false;
 
   while (!glfwWindowShouldClose(window)) {
-    // Create cursors on first loop iteration
+    // Load cursor images from .rgba files on first loop iteration
     if (!cursorsInitialized) {
-      cursorArrow = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
-      cursorCrosshair = glfwCreateStandardCursor(GLFW_CROSSHAIR_CURSOR);
-      cursorHand = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
+      const std::string assetDir = GetExeDir() + "assets/cursors/";
+      constexpr int kIconSize = 64;
+      constexpr int kIconBytes = kIconSize * kIconSize * 4;
+
+      auto loadRGBA = [&](const std::string& path) -> std::vector<uint8_t> {
+        std::vector<uint8_t> buf(kIconBytes, 0);
+        if (FILE* f = fopen(path.c_str(), "rb")) {
+          fread(buf.data(), 1, kIconBytes, f);
+          fclose(f);
+        }
+        return buf;  // returns zeroed buffer on failure (transparent = invisible cursor)
+      };
+
+      auto penData     = loadRGBA(assetDir + "Pen.rgba");
+      auto pencilData  = loadRGBA(assetDir + "Pencil.rgba");
+      auto rainbowData = loadRGBA(assetDir + "Rainbow.rgba");
+
+      GLFWimage penImg    = { kIconSize, kIconSize, penData.data() };
+      GLFWimage pencilImg = { kIconSize, kIconSize, pencilData.data() };
+      GLFWimage rainbowImg= { kIconSize, kIconSize, rainbowData.data() };
+      cursorPen     = glfwCreateCursor(&penImg,     11, 57);  // hotspot: nib tip (scaled 32→64)
+      cursorPencil  = glfwCreateCursor(&pencilImg,  32, 62);  // hotspot: pencil tip (scaled)
+      cursorRainbow = glfwCreateCursor(&rainbowImg, 32, 32);  // hotspot: center
+
+      auto loadTex = [&](const std::vector<uint8_t>& data) -> GLuint {
+        GLuint tex;
+        glGenTextures(1, &tex);
+        glBindTexture(GL_TEXTURE_2D, tex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, kIconSize, kIconSize,
+                     0, GL_RGBA, GL_UNSIGNED_BYTE, data.data());
+        return tex;
+      };
+      texPen     = loadTex(penData);
+      texPencil  = loadTex(pencilData);
+      texRainbow = loadTex(rainbowData);
+
       cursorsInitialized = true;
     }
     glfwPollEvents();
@@ -846,13 +911,13 @@ int main(int argc, char** argv) {
 
       switch (uiState.mode) {
         case InputMode::kDigit:
-          glfwSetCursor(window, cursorCrosshair);
+          glfwSetCursor(window, cursorPen);
           break;
         case InputMode::kPencil:
-          glfwSetCursor(window, cursorHand);
+          glfwSetCursor(window, cursorPencil);
           break;
         case InputMode::kColor:
-          glfwSetCursor(window, cursorArrow);
+          glfwSetCursor(window, cursorRainbow);
           break;
       }
     }
@@ -1008,7 +1073,23 @@ int main(int argc, char** argv) {
       uiState.selectedDifficulty = static_cast<Difficulty>(difficultyIdx);
     }
     ImGui::SameLine(0.0f, 16.0f);
-    ImGui::Text("Mode: %s", ModeName(uiState.mode));
+    // Mode selector radio buttons using cursor icon images
+    const ImVec2 iconSz(34, 34);
+    const auto modeBtn = [&](const char* id, GLuint tex, InputMode m) {
+      if (uiState.mode == m) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.5f, 0.9f, 1.0f));
+      } else {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 0.5f));
+      }
+      if (ImGui::ImageButton(id, (ImTextureID)(intptr_t)tex, iconSz))
+        uiState.mode = m;
+      ImGui::PopStyleColor();
+    };
+    modeBtn("##mode_digit",  texPen,     InputMode::kDigit);
+    ImGui::SameLine(0.0f, 4.0f);
+    modeBtn("##mode_pencil", texPencil,  InputMode::kPencil);
+    ImGui::SameLine(0.0f, 4.0f);
+    modeBtn("##mode_color",  texRainbow, InputMode::kColor);
 
     if (ImGui::Button("Auto Pencil", ImVec2(140, 34))) {
       requestAutoPencil = true;
@@ -1016,6 +1097,10 @@ int main(int argc, char** argv) {
     ImGui::SameLine();
     if (ImGui::Button("Naked", ImVec2(95, 34))) {
       requestSolveNakedSingles = true;
+    }
+    ImGui::SameLine(0.0f, 4.0f);
+    if (ImGui::Button(uiState.autoSolveNakedSingles ? "Auto:On" : "Auto:Off", ImVec2(85, 34))) {
+      uiState.autoSolveNakedSingles = !uiState.autoSolveNakedSingles;
     }
     ImGui::SameLine();
     if (ImGui::Button("Hidden", ImVec2(95, 34))) {
@@ -1031,8 +1116,12 @@ int main(int argc, char** argv) {
       if (hintAtApplyPhase) requestApplyHint = true;
       else requestHint = true;
     }
-    ImGui::SameLine(0.0f, 22.0f);
-    ImGui::Text("Q/E/R switch mode");
+    if (uiState.currentHint.revealPhase > 0) {
+      ImGui::SameLine(0.0f, 4.0f);
+      if (ImGui::Button("X##cancel_hint", ImVec2(28, 34))) {
+        ClearHint(uiState);
+      }
+    }
 
     ImGui::End();
 
@@ -1203,6 +1292,12 @@ int main(int argc, char** argv) {
           selected.pencil.reset();
           RemoveDigitFromPeerPencils(puzzleState.grid, uiState.selectedRow, uiState.selectedCol, digit);
           ClearHint(uiState);
+          // Auto-solve naked singles if enabled
+          if (uiState.autoSolveNakedSingles) {
+            ApplySolverAction(uiState, puzzleState,
+                [](Grid& g) { return AutoSolveNakedSingles(g); },
+                "Auto-solved ", " naked singles", "", 240);
+          }
         }
       }
       if (IsClearPressed()) {
@@ -1526,10 +1621,13 @@ int main(int argc, char** argv) {
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
 
-  // Clean up cursors (if they were created)
-  if (cursorArrow) glfwDestroyCursor(cursorArrow);
-  if (cursorCrosshair) glfwDestroyCursor(cursorCrosshair);
-  if (cursorHand) glfwDestroyCursor(cursorHand);
+  // Clean up cursors and textures (if they were created)
+  if (cursorPen) glfwDestroyCursor(cursorPen);
+  if (cursorPencil) glfwDestroyCursor(cursorPencil);
+  if (cursorRainbow) glfwDestroyCursor(cursorRainbow);
+  if (texPen) glDeleteTextures(1, &texPen);
+  if (texPencil) glDeleteTextures(1, &texPencil);
+  if (texRainbow) glDeleteTextures(1, &texRainbow);
 
   glfwDestroyWindow(window);
   glfwTerminate();
