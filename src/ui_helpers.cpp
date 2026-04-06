@@ -107,11 +107,14 @@ void DrawColorTagPanel(Grid& grid,
 
     if (ImGui::Button(("##ctag_" + std::to_string(tag)).c_str(), ImVec2(compactTagWidth, compactTagHeight))) {
       activeColor = tag;
-      mode = InputMode::kColor;  // Auto-switch to color mode when color is clicked
+      // Only auto-switch to color mode if not in candidate color mode
+      if (mode != InputMode::kCandidateColor) {
+        mode = InputMode::kColor;
+      }
     }
 
-    // Draw border around active color tag
-    if (mode == InputMode::kColor && activeColor == tag) {
+    // Draw border around active color tag (in both kColor and kCandidateColor modes)
+    if (((mode == InputMode::kColor || mode == InputMode::kCandidateColor) && activeColor == tag)) {
       ImVec2 buttonMin = ImGui::GetItemRectMin();
       ImVec2 buttonMax = ImGui::GetItemRectMax();
       constexpr ImU32 borderColor = IM_COL32(30, 100, 210, 255);  // Bright blue
@@ -162,6 +165,10 @@ void DrawColorTagPanel(Grid& grid,
       for (int r = 0; r < kGridSize; ++r) {
         for (int c = 0; c < kGridSize; ++c) {
           grid[r][c].colorTag = 0;
+          // Also clear candidate colors
+          for (int d = 1; d <= 9; ++d) {
+            grid[r][c].candidateColors[d] = 0;
+          }
         }
       }
     }
