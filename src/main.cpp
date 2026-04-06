@@ -919,7 +919,7 @@ int main(int argc, char** argv) {
       GLFWimage pencilImg = { kIconSize, kIconSize, pencilData };
       GLFWimage rainbowImg= { kIconSize, kIconSize, rainbowData };
       cursorPen     = glfwCreateCursor(&penImg,     6, 29);   // hotspot: nib tip (32x32)
-      cursorPencil  = glfwCreateCursor(&pencilImg,  31, 31);  // hotspot: pencil tip (32x32)
+      cursorPencil  = glfwCreateCursor(&pencilImg,  1, 31);  // hotspot: pencil tip (32x32)
       cursorRainbow = glfwCreateCursor(&rainbowImg, 16, 16);  // hotspot: center (32x32)
 
       if (debugLog) {
