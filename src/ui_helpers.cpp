@@ -123,6 +123,50 @@ void DrawColorTagPanel(Grid& grid,
     ImGui::PopID();
   }
 
+  // --- CLEAR ALL COLORS BUTTON (checkerboard pattern + red slash) ---
+  {
+    const ImVec2 buttonPos = ImGui::GetCursorScreenPos();
+    ImGui::InvisibleButton("clearColors", ImVec2(compactTagWidth, compactTagHeight));
+    bool hovered = ImGui::IsItemHovered();
+
+    // Draw checkerboard
+    const float cellWidth = compactTagWidth / 3.0f;
+    const float cellHeight = compactTagHeight / 3.0f;
+    for (int i = 0; i < 9; ++i) {
+      int row = i / 3;
+      int col = i % 3;
+      ImVec2 min(buttonPos.x + col * cellWidth, buttonPos.y + row * cellHeight);
+      ImVec2 max(min.x + cellWidth, min.y + cellHeight);
+      draw->AddRectFilled(min, max, tagColors[i + 1]);
+    }
+
+    // Draw red slash (bottom-right to top-left)
+    draw->AddLine(
+      ImVec2(buttonPos.x + compactTagWidth, buttonPos.y),
+      ImVec2(buttonPos.x, buttonPos.y + compactTagHeight),
+      IM_COL32(255, 0, 0, 255), 3.0f
+    );
+
+    // Grey overlay on hover
+    if (hovered) {
+      draw->AddRectFilled(
+        buttonPos,
+        ImVec2(buttonPos.x + compactTagWidth, buttonPos.y + compactTagHeight),
+        IM_COL32(128, 128, 128, 128)
+      );
+    }
+
+    // Clear all colors when clicked
+    if (ImGui::IsItemClicked()) {
+      activeColor = 0;  // Deselect all colors
+      for (int r = 0; r < kGridSize; ++r) {
+        for (int c = 0; c < kGridSize; ++c) {
+          grid[r][c].colorTag = 0;
+        }
+      }
+    }
+  }
+
   ImGui::Separator();
 
   // --- DIGIT HIGHLIGHTING SECTION (compact size) ---
