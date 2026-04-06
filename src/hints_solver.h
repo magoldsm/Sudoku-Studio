@@ -70,9 +70,6 @@ int AutoSolveNakedSingles(Grid& grid);
 int AutoSolveHiddenSingles(Grid& grid);
 // Comprehensive solver using all available solving techniques
 bool SolveComprehensive(Puzzle& puzzle);
-// Measures puzzle difficulty (1-8) based on techniques required
-// Returns difficulty level where puzzle gets stuck
-int MeasurePuzzleDifficulty(const Puzzle& puzzle);
 // Solves puzzle and returns total difficulty score
 // Score is sum of technique points across all solving steps
 int SolveAndScore(const Puzzle& puzzle);
