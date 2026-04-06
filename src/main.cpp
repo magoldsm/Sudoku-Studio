@@ -14,12 +14,6 @@
 #include <thread>
 #include <vector>
 
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
-
 #include <GLFW/glfw3.h>
 
 #include "app_state.h"
@@ -675,34 +669,31 @@ void DrawBoard(UIState& uiState,
 }
 
 // Create an OpenGL texture from RGBA pixel data
-static GLuint CreateGLTexture(const unsigned char* data, int size) {
+static GLuint CreateGLTexture(const unsigned char* data, int pixelSize) {
   GLuint tex;
   glGenTextures(1, &tex);
   glBindTexture(GL_TEXTURE_2D, tex);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pixelSize, pixelSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
   return tex;
 }
 
 // Returns the directory containing the running executable, with trailing slash.
+// Uses argv[0] which is available from main() parameters.
+static std::string g_exeDir = "./";
+
+static void InitExeDir(const char* argv0) {
+  try {
+    std::filesystem::path exePath = std::filesystem::absolute(argv0);
+    g_exeDir = exePath.parent_path().string() + "/";
+  } catch (...) {
+    g_exeDir = "./";
+  }
+}
+
 static std::string GetExeDir() {
-#ifdef _WIN32
-  char buf[MAX_PATH] = {0};
-  DWORD len = GetModuleFileNameA(nullptr, buf, MAX_PATH);
-  if (len == 0) return "./";
-  std::string path(buf, len);
-  size_t slash = path.rfind('\\');
-  return (slash != std::string::npos) ? path.substr(0, slash + 1) : "./";
-#else
-  char buf[4096] = {0};
-  long len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
-  if (len <= 0) return "./";
-  buf[len] = '\0';
-  std::string path(buf);
-  size_t slash = path.rfind('/');
-  return (slash != std::string::npos) ? path.substr(0, slash + 1) : "./";
-#endif
+  return g_exeDir;
 }
 
 }  // namespace sudoku
@@ -711,6 +702,8 @@ using namespace sudoku;
 
 // Load window icon from PNG file
 int main(int argc, char** argv) {
+  InitExeDir(argv[0]);  // Initialize exe directory for asset loading
+
   if (argc > 1 && std::string(argv[1]) == "--self-check") {
     return RunHintSelfChecks();
   }
