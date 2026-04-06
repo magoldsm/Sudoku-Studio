@@ -674,6 +674,17 @@ void DrawBoard(UIState& uiState,
   DrawColorTagPanel(puzzleState.grid, uiState.activeColor, uiState.mode, kTagColors, uiState.showPositionDigit, uiState.showEffectDigit, uiState.highlightPairs);
 }
 
+// Create an OpenGL texture from RGBA pixel data
+static GLuint CreateGLTexture(const unsigned char* data, int size) {
+  GLuint tex;
+  glGenTextures(1, &tex);
+  glBindTexture(GL_TEXTURE_2D, tex);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+  return tex;
+}
+
 // Returns the directory containing the running executable, with trailing slash.
 static std::string GetExeDir() {
 #ifdef _WIN32
@@ -863,39 +874,39 @@ int main(int argc, char** argv) {
       constexpr int kIconSize = 64;
       constexpr int kIconBytes = kIconSize * kIconSize * 4;
 
-      auto loadRGBA = [&](const std::string& path) -> std::vector<uint8_t> {
-        std::vector<uint8_t> buf(kIconBytes, 0);
-        if (FILE* f = fopen(path.c_str(), "rb")) {
-          fread(buf.data(), 1, kIconBytes, f);
-          fclose(f);
-        }
-        return buf;  // returns zeroed buffer on failure (transparent = invisible cursor)
-      };
+      // Static buffers to hold image data (persist for lifetime of program)
+      static unsigned char penData[kIconSize * kIconSize * 4] = {};
+      static unsigned char pencilData[kIconSize * kIconSize * 4] = {};
+      static unsigned char rainbowData[kIconSize * kIconSize * 4] = {};
 
-      auto penData     = loadRGBA(assetDir + "Pen.rgba");
-      auto pencilData  = loadRGBA(assetDir + "Pencil.rgba");
-      auto rainbowData = loadRGBA(assetDir + "Rainbow.rgba");
+      // Load Pen.rgba
+      if (FILE* f = fopen((assetDir + "Pen.rgba").c_str(), "rb")) {
+        fread(penData, 1, kIconBytes, f);
+        fclose(f);
+      }
 
-      GLFWimage penImg    = { kIconSize, kIconSize, penData.data() };
-      GLFWimage pencilImg = { kIconSize, kIconSize, pencilData.data() };
-      GLFWimage rainbowImg= { kIconSize, kIconSize, rainbowData.data() };
+      // Load Pencil.rgba
+      if (FILE* f = fopen((assetDir + "Pencil.rgba").c_str(), "rb")) {
+        fread(pencilData, 1, kIconBytes, f);
+        fclose(f);
+      }
+
+      // Load Rainbow.rgba
+      if (FILE* f = fopen((assetDir + "Rainbow.rgba").c_str(), "rb")) {
+        fread(rainbowData, 1, kIconBytes, f);
+        fclose(f);
+      }
+
+      GLFWimage penImg    = { kIconSize, kIconSize, penData };
+      GLFWimage pencilImg = { kIconSize, kIconSize, pencilData };
+      GLFWimage rainbowImg= { kIconSize, kIconSize, rainbowData };
       cursorPen     = glfwCreateCursor(&penImg,     11, 57);  // hotspot: nib tip (scaled 32→64)
       cursorPencil  = glfwCreateCursor(&pencilImg,  32, 62);  // hotspot: pencil tip (scaled)
       cursorRainbow = glfwCreateCursor(&rainbowImg, 32, 32);  // hotspot: center
 
-      auto loadTex = [&](const std::vector<uint8_t>& data) -> GLuint {
-        GLuint tex;
-        glGenTextures(1, &tex);
-        glBindTexture(GL_TEXTURE_2D, tex);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, kIconSize, kIconSize,
-                     0, GL_RGBA, GL_UNSIGNED_BYTE, data.data());
-        return tex;
-      };
-      texPen     = loadTex(penData);
-      texPencil  = loadTex(pencilData);
-      texRainbow = loadTex(rainbowData);
+      texPen     = CreateGLTexture(penData,     kIconSize);
+      texPencil  = CreateGLTexture(pencilData,  kIconSize);
+      texRainbow = CreateGLTexture(rainbowData, kIconSize);
 
       cursorsInitialized = true;
     }
