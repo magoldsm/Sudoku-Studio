@@ -33,15 +33,15 @@ constexpr size_t kMaxUndoHistory = 256;
 
 constexpr std::array<ImU32, 10> kTagColors = {
     0U,
-    IM_COL32(254, 205, 211, 255),  // 1: Light Red
-    IM_COL32(254, 240, 138, 255),  // 2: Light Yellow
-    IM_COL32(220, 252, 231, 255),  // 3: Light Green
-    IM_COL32(224, 242, 254, 255),  // 4: Light Blue
-    IM_COL32(233, 213, 255, 255),  // 5: Light Purple
-    IM_COL32(254, 215, 170, 255),  // 6: Light Orange
-    IM_COL32(200, 245, 255, 255),  // 7: Light Cyan (was similar blue)
-    IM_COL32(255, 245, 200, 255),  // 8: Light Tan/Beige (was similar blue)
-    IM_COL32(217, 249, 157, 255),  // 9: Light Green-Yellow
+    IM_COL32(255, 80, 100, 255),    // 1: Saturated Red
+    IM_COL32(255, 200, 0, 255),     // 2: Saturated Yellow
+    IM_COL32(100, 200, 100, 255),   // 3: Saturated Green
+    IM_COL32(100, 150, 255, 255),   // 4: Saturated Blue
+    IM_COL32(200, 100, 255, 255),   // 5: Saturated Purple
+    IM_COL32(255, 140, 50, 255),    // 6: Saturated Orange
+    IM_COL32(100, 220, 255, 255),   // 7: Saturated Cyan
+    IM_COL32(255, 200, 80, 255),    // 8: Saturated Golden
+    IM_COL32(180, 220, 80, 255),    // 9: Saturated Lime
 };
 
 void OpenHelpInBrowser() {
@@ -396,9 +396,9 @@ void DrawBoard(UIState& uiState,
     int clampedCol = std::clamp(clickedCol, 0, 8);
     int clampedRow = std::clamp(clickedRow, 0, 8);
 
-    // Detect double-click in color mode
+    // Detect double-click in color mode or candidate color mode
     const float currentTime = ImGui::GetTime();
-    const bool isDoubleClick = (uiState.mode == InputMode::kColor &&
+    const bool isDoubleClick = ((uiState.mode == InputMode::kColor || uiState.mode == InputMode::kCandidateColor) &&
                                 lastClickedRow == clampedRow &&
                                 lastClickedCol == clampedCol &&
                                 (currentTime - lastClickTime) < kDoubleClickThreshold);
@@ -426,6 +426,33 @@ void DrawBoard(UIState& uiState,
         }
       }
       // Don't select the cell in color mode
+    } else if (uiState.mode == InputMode::kCandidateColor) {
+      // In candidate color mode, handle candidate coloring with double-click to clear
+      const float localX = mouse.x - (origin.x + static_cast<float>(clampedCol) * kCellSize);
+      const float localY = mouse.y - (origin.y + static_cast<float>(clampedRow) * kCellSize);
+      const int subCol = std::clamp(static_cast<int>((localX / kCellSize) * 3.0f), 0, 2);
+      const int subRow = std::clamp(static_cast<int>((localY / kCellSize) * 3.0f), 0, 2);
+      const int candidateDigit = subRow * 3 + subCol + 1;
+
+      Cell& clickedCell = puzzleState.grid[clampedRow][clampedCol];
+      if (!clickedCell.fixed && clickedCell.value == 0) {
+        if (isDoubleClick) {
+          // Double-click: clear candidate color
+          if (clickedCell.candidateColors[candidateDigit] != 0) {
+            PushUndoState(uiState.undoHistory, puzzleState.grid);
+            clickedCell.candidateColors[candidateDigit] = 0;
+            ClearHint(uiState);
+          }
+        } else {
+          // Single-click: apply color to candidate
+          if (uiState.activeColor > 0) {
+            PushUndoState(uiState.undoHistory, puzzleState.grid);
+            clickedCell.candidateColors[candidateDigit] = uiState.activeColor;
+            ClearHint(uiState);
+          }
+        }
+      }
+      // Don't select the cell in candidate color mode
     } else {
       // Non-color modes: check if cell was already selected before updating selection
       const bool cellAlreadySelected =
@@ -444,20 +471,6 @@ void DrawBoard(UIState& uiState,
         if (clickedCell.pencil.test(markDigit - 1)) {
           PushUndoState(uiState.undoHistory, puzzleState.grid);
           clickedCell.pencil.reset(markDigit - 1);
-          ClearHint(uiState);
-        }
-      }
-      // In candidate color mode, color a candidate when clicked
-      if (uiState.mode == InputMode::kCandidateColor && cellAlreadySelected && !clickedCell.fixed && clickedCell.value == 0) {
-        const float localX = mouse.x - (origin.x + static_cast<float>(clickedCol) * kCellSize);
-        const float localY = mouse.y - (origin.y + static_cast<float>(clickedRow) * kCellSize);
-        const int subCol = std::clamp(static_cast<int>((localX / kCellSize) * 3.0f), 0, 2);
-        const int subRow = std::clamp(static_cast<int>((localY / kCellSize) * 3.0f), 0, 2);
-        const int candidateDigit = subRow * 3 + subCol + 1;
-        // Color this candidate with the active color (replace any highlight)
-        if (uiState.activeColor > 0) {
-          PushUndoState(uiState.undoHistory, puzzleState.grid);
-          clickedCell.candidateColors[candidateDigit] = uiState.activeColor;
           ClearHint(uiState);
         }
       }
