@@ -915,9 +915,9 @@ int main(int argc, char** argv) {
       GLFWimage penImg    = { kIconSize, kIconSize, penData };
       GLFWimage pencilImg = { kIconSize, kIconSize, pencilData };
       GLFWimage rainbowImg= { kIconSize, kIconSize, rainbowData };
-      cursorPen     = glfwCreateCursor(&penImg,     11, 57);  // hotspot: nib tip (scaled 32→64)
-      cursorPencil  = glfwCreateCursor(&pencilImg,  32, 62);  // hotspot: pencil tip (scaled)
-      cursorRainbow = glfwCreateCursor(&rainbowImg, 32, 32);  // hotspot: center
+      cursorPen     = glfwCreateCursor(&penImg,     6, 29);   // hotspot: nib tip (32x32)
+      cursorPencil  = glfwCreateCursor(&pencilImg,  16, 31);  // hotspot: pencil tip (32x32)
+      cursorRainbow = glfwCreateCursor(&rainbowImg, 16, 16);  // hotspot: center (32x32)
 
       texPen     = CreateGLTexture(penData,     kIconSize);
       texPencil  = CreateGLTexture(pencilData,  kIconSize);
