@@ -867,28 +867,50 @@ int main(int argc, char** argv) {
       constexpr int kIconSize = 64;
       constexpr int kIconBytes = kIconSize * kIconSize * 4;
 
+      // Debug: write to log file (visible on Windows with console hidden)
+      FILE* debugLog = fopen("sudoku_debug.log", "w");
+      if (debugLog) {
+        fprintf(debugLog, "Exe dir: %s\n", GetExeDir().c_str());
+        fprintf(debugLog, "Looking for assets in: %s\n", assetDir.c_str());
+        fflush(debugLog);
+      }
+
       // Static buffers to hold image data (persist for lifetime of program)
       static unsigned char penData[kIconSize * kIconSize * 4] = {};
       static unsigned char pencilData[kIconSize * kIconSize * 4] = {};
       static unsigned char rainbowData[kIconSize * kIconSize * 4] = {};
 
       // Load Pen.rgba
-      if (FILE* f = fopen((assetDir + "Pen.rgba").c_str(), "rb")) {
-        fread(penData, 1, kIconBytes, f);
+      std::string penPath = assetDir + "Pen.rgba";
+      if (FILE* f = fopen(penPath.c_str(), "rb")) {
+        size_t bytesRead = fread(penData, 1, kIconBytes, f);
         fclose(f);
+        if (debugLog) fprintf(debugLog, "Loaded Pen.rgba: %zu bytes\n", bytesRead);
+      } else {
+        if (debugLog) fprintf(debugLog, "Failed to open: %s\n", penPath.c_str());
       }
 
       // Load Pencil.rgba
-      if (FILE* f = fopen((assetDir + "Pencil.rgba").c_str(), "rb")) {
-        fread(pencilData, 1, kIconBytes, f);
+      std::string pencilPath = assetDir + "Pencil.rgba";
+      if (FILE* f = fopen(pencilPath.c_str(), "rb")) {
+        size_t bytesRead = fread(pencilData, 1, kIconBytes, f);
         fclose(f);
+        if (debugLog) fprintf(debugLog, "Loaded Pencil.rgba: %zu bytes\n", bytesRead);
+      } else {
+        if (debugLog) fprintf(debugLog, "Failed to open: %s\n", pencilPath.c_str());
       }
 
       // Load Rainbow.rgba
-      if (FILE* f = fopen((assetDir + "Rainbow.rgba").c_str(), "rb")) {
-        fread(rainbowData, 1, kIconBytes, f);
+      std::string rainbowPath = assetDir + "Rainbow.rgba";
+      if (FILE* f = fopen(rainbowPath.c_str(), "rb")) {
+        size_t bytesRead = fread(rainbowData, 1, kIconBytes, f);
         fclose(f);
+        if (debugLog) fprintf(debugLog, "Loaded Rainbow.rgba: %zu bytes\n", bytesRead);
+      } else {
+        if (debugLog) fprintf(debugLog, "Failed to open: %s\n", rainbowPath.c_str());
       }
+
+      if (debugLog) fclose(debugLog);
 
       GLFWimage penImg    = { kIconSize, kIconSize, penData };
       GLFWimage pencilImg = { kIconSize, kIconSize, pencilData };
