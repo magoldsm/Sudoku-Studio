@@ -579,7 +579,10 @@ void DrawBoard(UIState& uiState,
             noteFont->CalcTextSizeA(noteFont->FontSize, FLT_MAX, 0.0f, text.c_str());
 
         // Check if this candidate has a color assigned
-        int candidateColor = puzzleState.grid[r][c].candidateColors[d];
+        int candidateColor = 0;
+        if (d >= 1 && d <= 9) {
+          candidateColor = puzzleState.grid[r][c].candidateColors[d];
+        }
         if (candidateColor > 0 && candidateColor <= 9) {
           // Draw colored background for this candidate
           draw->AddRectFilled(ImVec2(notePos.x - 2.0f, notePos.y - 1.0f),
