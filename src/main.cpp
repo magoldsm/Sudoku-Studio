@@ -864,7 +864,7 @@ int main(int argc, char** argv) {
     // Load cursor images from .rgba files on first loop iteration
     if (!cursorsInitialized) {
       const std::string assetDir = GetExeDir() + "assets/cursors/";
-      constexpr int kIconSize = 64;
+      constexpr int kIconSize = 32;  // 32x32 cursor size
       constexpr int kIconBytes = kIconSize * kIconSize * 4;
 
       // Debug: write to log file (visible on Windows with console hidden)
@@ -929,23 +929,11 @@ int main(int argc, char** argv) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
 
-    // Set cursor based on mode (when mode changes)
-    // Note: This may not work on all platforms (Linux/WSL2 cursor handling is inconsistent)
+    // Cursor is set later after checking if mouse is over the board
     static InputMode lastMode = static_cast<InputMode>(-1);
-    if (uiState.mode != lastMode) {
+    bool modeChanged = (uiState.mode != lastMode);
+    if (modeChanged) {
       lastMode = uiState.mode;
-
-      switch (uiState.mode) {
-        case InputMode::kDigit:
-          glfwSetCursor(window, cursorPen);
-          break;
-        case InputMode::kPencil:
-          glfwSetCursor(window, cursorPencil);
-          break;
-        case InputMode::kColor:
-          glfwSetCursor(window, cursorRainbow);
-          break;
-      }
     }
 
     ImGui::NewFrame();
@@ -1406,6 +1394,25 @@ int main(int argc, char** argv) {
                        "Sharp text rendering + menu/toolbar workflow");
 
     DrawBoard(uiState, puzzleState, solved, highlightDigit, digitFont, noteFont);
+
+    // Set cursor based on mode, but only when mouse is over the board
+    bool mouseOverBoard = ImGui::IsItemHovered();
+    if (mouseOverBoard && modeChanged) {
+      switch (uiState.mode) {
+        case InputMode::kDigit:
+          glfwSetCursor(window, cursorPen);
+          break;
+        case InputMode::kPencil:
+          glfwSetCursor(window, cursorPencil);
+          break;
+        case InputMode::kColor:
+          glfwSetCursor(window, cursorRainbow);
+          break;
+      }
+    } else if (!mouseOverBoard) {
+      // Show default arrow cursor when not over board
+      glfwSetCursor(window, nullptr);
+    }
 
     // Position Technique Panel to the right of Board/Color Tags (on same row)
     ImGui::SameLine(0.0f, kBoardPanelMargin);
