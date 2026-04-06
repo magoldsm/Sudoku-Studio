@@ -919,6 +919,13 @@ int main(int argc, char** argv) {
       cursorPencil  = glfwCreateCursor(&pencilImg,  16, 31);  // hotspot: pencil tip (32x32)
       cursorRainbow = glfwCreateCursor(&rainbowImg, 16, 16);  // hotspot: center (32x32)
 
+      if (debugLog) {
+        fprintf(debugLog, "Cursor creation:\n");
+        fprintf(debugLog, "  cursorPen: %p\n", (void*)cursorPen);
+        fprintf(debugLog, "  cursorPencil: %p\n", (void*)cursorPencil);
+        fprintf(debugLog, "  cursorRainbow: %p\n", (void*)cursorRainbow);
+      }
+
       texPen     = CreateGLTexture(penData,     kIconSize);
       texPencil  = CreateGLTexture(pencilData,  kIconSize);
       texRainbow = CreateGLTexture(rainbowData, kIconSize);
@@ -1397,6 +1404,12 @@ int main(int argc, char** argv) {
 
     // Set cursor based on mode, but only when mouse is over the board
     bool mouseOverBoard = ImGui::IsItemHovered();
+    static bool lastMouseOverBoard = false;
+    if (mouseOverBoard != lastMouseOverBoard) {
+      std::cerr << "Mouse over board: " << (mouseOverBoard ? "true" : "false") << std::endl;
+      lastMouseOverBoard = mouseOverBoard;
+    }
+
     if (mouseOverBoard) {
       // Show custom cursor when over board
       switch (uiState.mode) {
