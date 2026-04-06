@@ -55,6 +55,9 @@ struct UIState {
 
   // Score details popup
   bool openScoreDetailsPopup = false;
+
+  // UI state for cursor logic
+  bool mouseOverBoard = false;
 };
 
 }  // namespace sudoku

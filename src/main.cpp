@@ -662,6 +662,9 @@ void DrawBoard(UIState& uiState,
 
   DrawGridLines(draw, origin, boardMax);
 
+  // Track whether mouse is over board (for cursor logic)
+  uiState.mouseOverBoard = ImGui::IsItemHovered();
+
   ImGui::EndChild();
 
   ImGui::SameLine(0.0f, kBoardPanelMargin);
@@ -936,12 +939,6 @@ int main(int argc, char** argv) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
 
-    // Cursor is set later after checking if mouse is over the board
-    static InputMode lastMode = static_cast<InputMode>(-1);
-    bool modeChanged = (uiState.mode != lastMode);
-    if (modeChanged) {
-      lastMode = uiState.mode;
-    }
 
     ImGui::NewFrame();
 
@@ -1403,14 +1400,8 @@ int main(int argc, char** argv) {
     DrawBoard(uiState, puzzleState, solved, highlightDigit, digitFont, noteFont);
 
     // Set cursor based on mode, but only when mouse is over the board
-    bool mouseOverBoard = ImGui::IsItemHovered();
-    static bool lastMouseOverBoard = false;
-    if (mouseOverBoard != lastMouseOverBoard) {
-      std::cerr << "Mouse over board: " << (mouseOverBoard ? "true" : "false") << std::endl;
-      lastMouseOverBoard = mouseOverBoard;
-    }
-
-    if (mouseOverBoard) {
+    // (mouseOverBoard is set by DrawBoard before EndChild)
+    if (uiState.mouseOverBoard) {
       // Show custom cursor when over board
       switch (uiState.mode) {
         case InputMode::kDigit:
