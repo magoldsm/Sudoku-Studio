@@ -34,14 +34,14 @@ constexpr size_t kMaxUndoHistory = 256;
 constexpr std::array<ImU32, 10> kTagColors = {
     0U,
     IM_COL32(255, 80, 100, 255),    // 1: Saturated Red
-    IM_COL32(255, 200, 0, 255),     // 2: Saturated Yellow
-    IM_COL32(100, 200, 100, 255),   // 3: Saturated Green
+    IM_COL32(255, 255, 0, 255),     // 2: Pure Yellow
+    IM_COL32(0, 180, 80, 255),      // 3: Teal Green
     IM_COL32(100, 150, 255, 255),   // 4: Saturated Blue
     IM_COL32(200, 100, 255, 255),   // 5: Saturated Purple
-    IM_COL32(255, 140, 50, 255),    // 6: Saturated Orange
+    IM_COL32(255, 120, 0, 255),     // 6: Saturated Orange
     IM_COL32(100, 220, 255, 255),   // 7: Saturated Cyan
-    IM_COL32(255, 200, 80, 255),    // 8: Saturated Golden
-    IM_COL32(180, 220, 80, 255),    // 9: Saturated Lime
+    IM_COL32(255, 160, 0, 255),     // 8: Deep Orange (more orange, less yellow)
+    IM_COL32(100, 255, 0, 255),     // 9: Bright Lime Green
 };
 
 void OpenHelpInBrowser() {
