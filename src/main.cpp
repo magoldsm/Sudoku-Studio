@@ -158,9 +158,9 @@ bool UndoLastChange(Grid& grid, std::vector<Grid>& undoHistory) {
 // Set window icon from Windows resources (.rc file)
 void SetWindowIcon(GLFWwindow* window) {
   #ifdef _WIN32
-    // Load icon from the .rc resource (IDI_ICON1, typically resource ID 1)
+    // Load icon from the .rc resource (IDI_ICON1 - string resource name)
     HINSTANCE hInstance = GetModuleHandle(nullptr);
-    HICON hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(1));
+    HICON hIcon = LoadIconW(hInstance, L"IDI_ICON1");
 
     FILE* debugLog = fopen("sudoku_debug.log", "a");
     if (debugLog) {
@@ -945,7 +945,8 @@ int main(int argc, char** argv) {
       constexpr int kIconBytes = kIconSize * kIconSize * 4;
 
       // Debug: write to log file (visible on Windows with console hidden)
-      FILE* debugLog = fopen("sudoku_debug.log", "w");
+      // Use append mode to preserve any earlier logging (e.g., from SetWindowIcon)
+      FILE* debugLog = fopen("sudoku_debug.log", "a");
       if (debugLog) {
         fprintf(debugLog, "Exe dir: %s\n", GetExeDir().c_str());
         fprintf(debugLog, "Looking for assets in: %s\n", assetDir.c_str());
