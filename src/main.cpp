@@ -157,12 +157,17 @@ bool UndoLastChange(Grid& grid, std::vector<Grid>& undoHistory) {
 
 // Set window icon from Windows resources (.rc file)
 void SetWindowIcon(GLFWwindow* window) {
+  FILE* debugLog = fopen("sudoku_debug.log", "a");
+  if (debugLog) {
+    fprintf(debugLog, "SetWindowIcon called: window=%p\n", (void*)window);
+    fflush(debugLog);
+  }
+
   #ifdef _WIN32
     // Load icon from the .rc resource (IDI_ICON1 - string resource name)
     HINSTANCE hInstance = GetModuleHandle(nullptr);
     HICON hIcon = LoadIconW(hInstance, L"IDI_ICON1");
 
-    FILE* debugLog = fopen("sudoku_debug.log", "a");
     if (debugLog) {
       fprintf(debugLog, "SetWindowIcon: hInstance=%p, hIcon=%p\n", (void*)hInstance, (void*)hIcon);
       fflush(debugLog);
@@ -182,8 +187,9 @@ void SetWindowIcon(GLFWwindow* window) {
     } else {
       if (debugLog) fprintf(debugLog, "SetWindowIcon: LoadIconW failed\n");
     }
-    if (debugLog) fclose(debugLog);
   #endif
+
+  if (debugLog) fclose(debugLog);
 }
 
 // Normalize line endings: convert CRLF to LF for consistent handling
