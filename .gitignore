@@ -24,3 +24,5 @@ assets/cursors/Rainbow - Copy.zip
 view_rgba_simple.py
 view_rgba.py
 sudoku_debug.log
+test_cursor.cpp
+test_cursor

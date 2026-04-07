@@ -406,13 +406,16 @@ void DrawBoard(UIState& uiState,
   const ImVec2 boardMax(origin.x + kBoardSize, origin.y + kBoardSize);
   ImGui::InvisibleButton("board_canvas", ImVec2(kBoardSize, kBoardSize));
 
+  // Capture hover status for cursor logic (must be done right after InvisibleButton)
+  uiState.mouseOverBoard = ImGui::IsItemHovered();
+
   // Track double-click for color mode
   static int lastClickedRow = -1;
   static int lastClickedCol = -1;
   static float lastClickTime = 0.0f;
   constexpr float kDoubleClickThreshold = 0.3f;  // 300ms
 
-  if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+  if (uiState.mouseOverBoard && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
     const ImVec2 mouse = ImGui::GetIO().MousePos;
     const int clickedCol = static_cast<int>((mouse.x - origin.x) / kCellSize);
     const int clickedRow = static_cast<int>((mouse.y - origin.y) / kCellSize);
@@ -725,9 +728,6 @@ void DrawBoard(UIState& uiState,
 
   DrawGridLines(draw, origin, boardMax);
 
-  // Track whether mouse is over board (for cursor logic)
-  uiState.mouseOverBoard = ImGui::IsItemHovered();
-
   ImGui::EndChild();
 
   ImGui::SameLine(0.0f, kBoardPanelMargin);
@@ -928,20 +928,13 @@ int main(int argc, char** argv) {
   bool cursorsInitialized = false;
 
   while (!glfwWindowShouldClose(window)) {
-    // Load cursor images from .rgba files on first loop iteration
-    if (!cursorsInitialized) {
+    // Load RGBA data from files (needed for button textures on all platforms, cursors on Windows)
+    // Use separate flag since Linux initializes cursors at startup but still needs texture loading
+    static bool texturesLoaded = false;
+    if (!texturesLoaded) {
       const std::string assetDir = GetExeDir() + "assets/cursors/";
       constexpr int kIconSize = 32;  // 32x32 cursor size
       constexpr int kIconBytes = kIconSize * kIconSize * 4;
-
-      // Debug: write to log file (visible on Windows with console hidden)
-      // Use append mode to preserve any earlier logging (e.g., from SetWindowIcon)
-      FILE* debugLog = fopen("sudoku_debug.log", "a");
-      if (debugLog) {
-        fprintf(debugLog, "Exe dir: %s\n", GetExeDir().c_str());
-        fprintf(debugLog, "Looking for assets in: %s\n", assetDir.c_str());
-        fflush(debugLog);
-      }
 
       // Static buffers to hold image data (persist for lifetime of program)
       static unsigned char penData[kIconSize * kIconSize * 4] = {};
@@ -952,68 +945,51 @@ int main(int argc, char** argv) {
       // Load Pen.rgba
       std::string penPath = assetDir + "Pen.rgba";
       if (FILE* f = fopen(penPath.c_str(), "rb")) {
-        size_t bytesRead = fread(penData, 1, kIconBytes, f);
+        fread(penData, 1, kIconBytes, f);
         fclose(f);
-        if (debugLog) fprintf(debugLog, "Loaded Pen.rgba: %zu bytes\n", bytesRead);
-      } else {
-        if (debugLog) fprintf(debugLog, "Failed to open: %s\n", penPath.c_str());
       }
 
       // Load Pencil.rgba
       std::string pencilPath = assetDir + "Pencil.rgba";
       if (FILE* f = fopen(pencilPath.c_str(), "rb")) {
-        size_t bytesRead = fread(pencilData, 1, kIconBytes, f);
+        fread(pencilData, 1, kIconBytes, f);
         fclose(f);
-        if (debugLog) fprintf(debugLog, "Loaded Pencil.rgba: %zu bytes\n", bytesRead);
-      } else {
-        if (debugLog) fprintf(debugLog, "Failed to open: %s\n", pencilPath.c_str());
       }
 
       // Load Rainbow.rgba
       std::string rainbowPath = assetDir + "Rainbow.rgba";
       if (FILE* f = fopen(rainbowPath.c_str(), "rb")) {
-        size_t bytesRead = fread(rainbowData, 1, kIconBytes, f);
+        fread(rainbowData, 1, kIconBytes, f);
         fclose(f);
-        if (debugLog) fprintf(debugLog, "Loaded Rainbow.rgba: %zu bytes\n", bytesRead);
-      } else {
-        if (debugLog) fprintf(debugLog, "Failed to open: %s\n", rainbowPath.c_str());
       }
 
       // Load RainbowPencil.rgba
       std::string rainbowPencilPath = assetDir + "RainbowPencil.rgba";
       if (FILE* f = fopen(rainbowPencilPath.c_str(), "rb")) {
-        size_t bytesRead = fread(rainbowPencilData, 1, kIconBytes, f);
+        fread(rainbowPencilData, 1, kIconBytes, f);
         fclose(f);
-        if (debugLog) fprintf(debugLog, "Loaded RainbowPencil.rgba: %zu bytes\n", bytesRead);
-      } else {
-        if (debugLog) fprintf(debugLog, "Failed to open: %s\n", rainbowPencilPath.c_str());
       }
-
-      if (debugLog) fclose(debugLog);
 
       GLFWimage penImg    = { kIconSize, kIconSize, penData };
       GLFWimage pencilImg = { kIconSize, kIconSize, pencilData };
       GLFWimage rainbowImg= { kIconSize, kIconSize, rainbowData };
       GLFWimage rainbowPencilImg = { kIconSize, kIconSize, rainbowPencilData };
+
+      // Create custom cursors (all platforms; cursor setting is guarded by WSL check at runtime)
       cursorPen     = glfwCreateCursor(&penImg,     6, 29);   // hotspot: nib tip (32x32)
       cursorPencil  = glfwCreateCursor(&pencilImg,  1, 31);  // hotspot: pencil tip (32x32)
       cursorRainbow = glfwCreateCursor(&rainbowImg, 16, 16);  // hotspot: center (32x32)
       cursorRainbowPencil = glfwCreateCursor(&rainbowPencilImg, 1, 31);  // hotspot: pencil tip (32x32)
 
-      if (debugLog) {
-        fprintf(debugLog, "Cursor creation:\n");
-        fprintf(debugLog, "  cursorPen: %p\n", (void*)cursorPen);
-        fprintf(debugLog, "  cursorPencil: %p\n", (void*)cursorPencil);
-        fprintf(debugLog, "  cursorRainbow: %p\n", (void*)cursorRainbow);
-      }
-
+      // Always create textures for buttons (all platforms)
       texPen     = CreateGLTexture(penData,     kIconSize);
       texPencil  = CreateGLTexture(pencilData,  kIconSize);
       texRainbow = CreateGLTexture(rainbowData, kIconSize);
       texRainbowPencil = CreateGLTexture(rainbowPencilData, kIconSize);
 
-      cursorsInitialized = true;
+      texturesLoaded = true;
     }
+
     glfwPollEvents();
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -1486,24 +1462,30 @@ int main(int argc, char** argv) {
     DrawBoard(uiState, puzzleState, solved, highlightDigit, digitFont, noteFont);
 
     // Set cursor based on mode, but only when mouse is over the board
-    // (mouseOverBoard is set by DrawBoard before EndChild)
-    if (uiState.mouseOverBoard) {
+    // (mouseOverBoard is set by DrawBoard after InvisibleButton)
+    // Note: Cursors work on Windows and native macOS/Linux, but not in WSL
+    static bool useCustomCursors = !IsWSL();
+    if (useCustomCursors && uiState.mouseOverBoard) {
       // Show custom cursor when over board
+      GLFWcursor* newCursor = nullptr;
       switch (uiState.mode) {
         case InputMode::kDigit:
-          glfwSetCursor(window, cursorPen);
+          newCursor = cursorPen;
           break;
         case InputMode::kPencil:
-          glfwSetCursor(window, cursorPencil);
+          newCursor = cursorPencil;
           break;
         case InputMode::kColor:
-          glfwSetCursor(window, cursorRainbow);
+          newCursor = cursorRainbow;
           break;
         case InputMode::kCandidateColor:
-          glfwSetCursor(window, cursorRainbowPencil);
+          newCursor = cursorRainbowPencil;
           break;
       }
-    } else {
+      if (newCursor) {
+        glfwSetCursor(window, newCursor);
+      }
+    } else if (useCustomCursors) {
       // Show default arrow cursor when not over board
       glfwSetCursor(window, nullptr);
     }
