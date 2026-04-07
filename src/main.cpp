@@ -162,15 +162,27 @@ void SetWindowIcon(GLFWwindow* window) {
     HINSTANCE hInstance = GetModuleHandle(nullptr);
     HICON hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(1));
 
+    FILE* debugLog = fopen("sudoku_debug.log", "a");
+    if (debugLog) {
+      fprintf(debugLog, "SetWindowIcon: hInstance=%p, hIcon=%p\n", (void*)hInstance, (void*)hIcon);
+      fflush(debugLog);
+    }
+
     if (hIcon != nullptr) {
       // Get the native HWND from GLFW window
       HWND hWnd = glfwGetWin32Window(window);
+      if (debugLog) fprintf(debugLog, "  hWnd=%p\n", (void*)hWnd);
+
       if (hWnd != nullptr) {
         // Set both small and large icons for window title bar and taskbar
-        SendMessageW(hWnd, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
-        SendMessageW(hWnd, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
+        LRESULT res1 = SendMessageW(hWnd, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
+        LRESULT res2 = SendMessageW(hWnd, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
+        if (debugLog) fprintf(debugLog, "  SendMessageW(ICON_BIG)=%lld, SendMessageW(ICON_SMALL)=%lld\n", res1, res2);
       }
+    } else {
+      if (debugLog) fprintf(debugLog, "SetWindowIcon: LoadIconW failed\n");
     }
+    if (debugLog) fclose(debugLog);
   #endif
 }
 
