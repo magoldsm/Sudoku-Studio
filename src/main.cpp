@@ -14,12 +14,15 @@
 #include <thread>
 #include <vector>
 
+#ifdef _WIN32
+  #define GLFW_EXPOSE_NATIVE_WIN32  // Enable native Windows functions before including glfw3.h
+  #define NOMINMAX  // Prevent windows.h from defining min/max macros
+  #include <windows.h>
+#endif
+
 #include <GLFW/glfw3.h>
 
 #ifdef _WIN32
-  #define GLFW_EXPOSE_NATIVE_WIN32  // Enable native Windows functions
-  #define NOMINMAX  // Prevent windows.h from defining min/max macros
-  #include <windows.h>
   #include <GLFW/glfw3native.h>  // For glfwGetWin32Window()
 #endif
 
@@ -155,9 +158,9 @@ bool UndoLastChange(Grid& grid, std::vector<Grid>& undoHistory) {
 // Set window icon from Windows resources (.rc file)
 void SetWindowIcon(GLFWwindow* window) {
   #ifdef _WIN32
-    // Load icon from the .rc resource (IDI_ICON1 = resource ID 101)
+    // Load icon from the .rc resource (IDI_ICON1, typically resource ID 1)
     HINSTANCE hInstance = GetModuleHandle(nullptr);
-    HICON hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(101));
+    HICON hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(1));
 
     if (hIcon != nullptr) {
       // Get the native HWND from GLFW window
