@@ -1304,9 +1304,21 @@ int main(int argc, char** argv) {
         uiState.currentHint = GenerateHint(puzzleState.grid);
         uiState.currentHint.revealPhase = 1;
 
-        // Compute missing candidates for hint-affected cells (only those relevant to the hint)
+        // Compute missing candidates for hint-affected cells (only elimination targets, not chain cells)
         uiState.hintMissingCandidates.clear();
         for (const HintCell& cell : uiState.currentHint.affectedCells) {
+          // Skip cells that are part of the chain itself - they're for reasoning, not elimination
+          bool isChainCell = false;
+          for (const HintCell& chainCell : uiState.currentHint.chainCells) {
+            if (chainCell.row == cell.row && chainCell.col == cell.col) {
+              isChainCell = true;
+              break;
+            }
+          }
+          if (isChainCell) {
+            continue;  // Don't show missing candidates for chain cells
+          }
+
           const std::vector<int> missing = GetMissingCandidates(puzzleState.grid, cell.row, cell.col);
           // Filter: only keep missing candidates that are involved in this hint
           std::vector<int> relevantMissing;
